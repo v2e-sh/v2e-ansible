@@ -1,0 +1,7 @@
+---
+# The `docker` role is vendored under roles/docker (from geerlingguy.docker).
+# If you'd rather pull it from Ansible Galaxy instead of vendoring, remove
+# roles/docker and run: ansible-galaxy install -r requirements.yml
+roles:
+  - name: geerlingguy.docker
+    version: "8.0.0"
