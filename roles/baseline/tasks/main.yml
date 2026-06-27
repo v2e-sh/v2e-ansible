@@ -9,11 +9,25 @@
     update_cache: true
     cache_valid_time: 3600
 
+# qemu-guest-agent can only start if the VM exposes the virtio guest-agent
+# channel (Proxmox `agent: enabled=1`). Gate on the device so a VM with the
+# agent disabled doesn't fail the entire baseline.
+- name: Detect QEMU guest-agent channel
+  ansible.builtin.stat:
+    path: /dev/virtio-ports/org.qemu.guest_agent.0
+  register: baseline_qga_channel
+
 - name: Ensure qemu-guest-agent is enabled and running
   ansible.builtin.systemd_service:
     name: qemu-guest-agent
     enabled: true
     state: started
+  when: baseline_qga_channel.stat.exists
+
+- name: Note when the guest-agent channel is absent
+  ansible.builtin.debug:
+    msg: "QEMU guest-agent channel not present (VM has the agent disabled in Proxmox) — skipping. Enable `agent { enabled = true }` on the VM to use it."
+  when: not baseline_qga_channel.stat.exists
 
 # --- Time sync (timedatectl set-ntp enables + starts systemd-timesyncd) ---
 - name: Check current NTP synchronization state
