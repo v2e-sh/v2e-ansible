@@ -1,0 +1,9 @@
+name: ci
+on: [pull_request, push]
+jobs:
+  ansible:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python -m pip install ansible
+      - run: ansible-playbook --syntax-check -i inventory/hosts.ini site.yml
