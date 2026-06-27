@@ -1,0 +1,23 @@
+---
+# General, minimal, reusable VyOS hardening (1.4 sagitta / 1.5 circinus).
+# No topology/firewall specifics — those belong in vyos-hardening-v2espec.
+#
+# PREREQUISITE: the management user's SSH public key must ALREADY be authorized on
+# the router (Terraform seeds the mesh keys). This enables key-only SSH, so a
+# missing/!matching key = lockout. Every line below is safe over an existing
+# key-based session (none drop the connection), so a plain commit is fine.
+
+vyos_hardening_save: true
+
+# Minimal general hardening commands. Override the whole list to customize.
+vyos_hardening_lines:
+  - "set service ssh disable-password-authentication"      # key-only login
+  - "set service ssh client-keepalive-interval 180"        # drop dead sessions
+  - "set service ssh disable-host-validation"              # skip reverse-DNS on connect
+  - "set service ssh loglevel info"                        # explicit, for auditing
+  # Make confirmed-commit non-disruptive (reload, not reboot) so the LATER
+  # vyos-hardening-v2espec can apply risky firewall changes with commit-confirm.
+  - "set system config-management commit-confirm action reload"
+
+# Pre-login banner ("" to skip).
+vyos_hardening_login_banner: "Authorized access only."

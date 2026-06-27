@@ -3,9 +3,10 @@
 # user. See README.md.
 #
 #   ping -> baseline -> hardening -> patch (on demand) -> docker (services)
+#   vyos-hardening  (on demand: --tags vyos)
 #
-# ansible.builtin plays target the `linux` group (control/services/agent) so the
-# VyOS router (network_cli, added later) is never in their scope.
+# ansible.builtin plays target the `linux` group (control/services/agent); the
+# VyOS router is a separate network_cli play (--tags vyos), never in linux scope.
 
 - name: Smoke test — confirm the automation mesh can reach every node
   hosts: linux
@@ -46,3 +47,12 @@
         # Users to add to the `docker` group (uncomment as needed):
         # docker_users:
         #   - ansible
+
+- name: VyOS router hardening (on demand — run with --tags vyos)
+  hosts: vyos
+  gather_facts: false
+  tags:
+    - vyos
+    - never
+  roles:
+    - vyos-hardening-basic
