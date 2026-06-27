@@ -1,0 +1,19 @@
+---
+# General, reusable baseline hardening for ANY Debian/Ubuntu host. Minimal and
+# host-agnostic — no environment-specific assumptions. Host/role-specific
+# hardening belongs in deb-hardening-{server,agent,host}. All toggleable.
+
+# --- SSH daemon (drop-in: /etc/ssh/sshd_config.d/10-hardening.conf) ---
+deb_hardening_ssh: true
+deb_hardening_ssh_password_auth: false            # key-only auth
+deb_hardening_ssh_permit_root_login: "no"         # "no" | "prohibit-password"
+deb_hardening_ssh_max_auth_tries: 4
+deb_hardening_ssh_x11_forwarding: false
+deb_hardening_ssh_client_alive_interval: 300
+deb_hardening_ssh_client_alive_count_max: 2
+
+# --- sysctl network/kernel hardening (/etc/sysctl.d/90-hardening.conf) ---
+deb_hardening_sysctl: true
+
+# --- fail2ban (sshd jail) ---
+deb_hardening_fail2ban: true
