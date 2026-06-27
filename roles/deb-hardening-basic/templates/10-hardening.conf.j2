@@ -1,0 +1,11 @@
+# Managed by deb-hardening-basic — general SSH hardening.
+# Key auth is always preserved. This file sorts before 50-cloud-init.conf, so it
+# overrides the cloud image's PasswordAuthentication default.
+PubkeyAuthentication yes
+PasswordAuthentication {{ 'yes' if deb_hardening_ssh_password_auth else 'no' }}
+KbdInteractiveAuthentication {{ 'yes' if deb_hardening_ssh_password_auth else 'no' }}
+PermitRootLogin {{ deb_hardening_ssh_permit_root_login }}
+MaxAuthTries {{ deb_hardening_ssh_max_auth_tries }}
+X11Forwarding {{ 'yes' if deb_hardening_ssh_x11_forwarding else 'no' }}
+ClientAliveInterval {{ deb_hardening_ssh_client_alive_interval }}
+ClientAliveCountMax {{ deb_hardening_ssh_client_alive_count_max }}

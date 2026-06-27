@@ -1,24 +1,33 @@
 ---
-# Phase 1 baseline. Run FROM the control node (controller = control) as the
-# `ansible` automation user. See README.md.
+# Run FROM the control node (controller = control) as the `ansible` automation
+# user. See README.md.
 #
-#   ping (smoke)  ->  baseline (all)  ->  patch (on demand)  ->  docker (services)
+#   ping -> baseline -> hardening -> patch (on demand) -> docker (services)
+#
+# ansible.builtin plays target the `linux` group (control/services/agent) so the
+# VyOS router (network_cli, added later) is never in their scope.
 
 - name: Smoke test — confirm the automation mesh can reach every node
-  hosts: all
+  hosts: linux
   gather_facts: false
   tasks:
     - name: Ping all managed hosts
       ansible.builtin.ping:
 
-- name: Baseline configuration on all managed nodes
-  hosts: all
+- name: Baseline configuration on all Linux nodes
+  hosts: linux
   become: true
   roles:
     - baseline
 
+- name: Basic system hardening on all Linux nodes
+  hosts: linux
+  become: true
+  roles:
+    - deb-hardening-basic
+
 - name: Orchestrated full patch (on demand — run with --tags patch)
-  hosts: all
+  hosts: linux
   become: true
   tags:
     - patch
