@@ -1,55 +1,65 @@
-# Docker deployment — run from the control node
+# v2e-ansible
 
-Installs Docker (CE + Compose v2 plugin) on the **control** and **services** hosts
-using the vendored `docker` role (geerlingguy/ansible-role-docker, pinned to 8.0.0).
+Phase-2 automation for the v2e homelab. Cloned to `~ansible/ansible` on the
+**control** node by cloud-init at first boot and run as the `ansible` automation
+account (NOPASSWD sudo on every node; the mesh SSH key + `~/.ssh/config` are
+provisioned by Terraform in v2e-tf).
 
 ## Execution model
 
-Ansible runs **from within the control node**, which already has SSH access to the
-internal network. No jump host, ProxyJump, or extra key distribution required.
+Ansible runs **from control**. control manages itself over a local connection;
+other nodes are reached by direct SSH as the `ansible` user.
 
-| Host      | How it's reached                                              |
-|-----------|--------------------------------------------------------------|
-| `control` | locally — `ansible_connection: local`                        |
-| `services`| direct SSH from control via `~/.ssh/config` alias → 10.1.2.10 |
+| Host       | Reached via                                     |
+|------------|-------------------------------------------------|
+| `control`  | local — `ansible_connection=local`              |
+| `services` | direct SSH from control → 10.1.2.10 (`ansible`) |
 
-## 1. Get the folder onto control
+Ansible itself is installed on control via `pipx install --include-deps ansible`
+(user-isolated, full bundle incl. community collections) by the cloud-init
+bootstrap — not apt.
 
-From your workstation, through the router forward:
+## What `site.yml` does
 
-```bash
-scp -P 2201 -r ansible v2e@192.168.1.2:~/ansible
-# or, on control:  git clone <your-repo> ~/ansible
+```
+ping (smoke test)  ->  baseline (all)  ->  patch (on demand)  ->  docker (services)
 ```
 
-## 2. Install Ansible on control (one-time)
+- **smoke test** — `ping` every node; proves the automation mesh is reachable.
+- **baseline** (`roles/baseline`) — qemu-guest-agent, time sync, timezone,
+  journald disk cap, and unattended-upgrades as a **security-only, no-reboot**
+  safety net. Pure `ansible.builtin`.
+- **patch** (`roles/patch`) — on-demand full `dist-upgrade` + reboot-if-required,
+  controller-safe. **Tag-gated**: skipped by default, runs only with `--tags patch`.
+- **docker** (`roles/docker`, vendored geerlingguy.docker) — Docker CE + Compose
+  v2 on `services`.
 
-```bash
-sudo apt update && sudo apt install -y ansible      # or: pipx install ansible
-```
+### OS patching layers
 
-> Needs working internet egress. If outbound HTTPS still hangs (the MTU/MSS
-> black-hole on the router path), fix that first — otherwise both this step and
-> the Docker download below will time out.
+1. **First boot (once)** — cloud-init `package_upgrade` + `package_reboot_if_required`
+   (in v2e-tf) run a full `dist-upgrade` *before* Ansible starts, so Ansible always
+   sees a patched system.
+2. **Ongoing security (autonomous)** — unattended-upgrades, security-only, no
+   auto-reboot (baseline role).
+3. **On-demand full patch** — `ansible-playbook site.yml --tags patch` (patch role).
 
-## 3. Run it
+## Run it manually (on control)
 
 ```bash
 cd ~/ansible
-ansible all -m ping              # connectivity check (control + services)
-ansible-playbook site.yml        # deploy Docker
+ansible all -m ping                       # connectivity
+ansible-playbook site.yml                 # baseline + docker (patch is skipped)
+ansible-playbook site.yml --tags patch    # on-demand full patch + reboot-if-needed
 ```
-
-Add `-K` if `v2e` needs a sudo password on any node (control has passwordless sudo;
-services is unverified).
 
 ## Layout
 
 ```
-ansible.cfg            # points at inventory/ and roles/, sudo defaults
-inventory/hosts.ini    # control (local) + services (direct SSH)
-site.yml               # applies the docker role to control:services
-requirements.yml       # Galaxy source for the vendored role (optional re-pull)
-roles/docker/          # vendored geerlingguy.docker role
+ansible.cfg            # inventory + roles_path, sudo defaults
+inventory/hosts.ini    # control (local) + services (SSH as ansible)
+site.yml               # the playbook chain above
+requirements.yml       # Galaxy sources (none active; docker is vendored)
+roles/baseline/        # OS baseline (ansible.builtin only)
+roles/patch/           # on-demand full patch (ansible.builtin only)
+roles/docker/          # vendored geerlingguy.docker
 ```
-# v2e-ansible

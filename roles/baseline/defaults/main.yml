@@ -1,0 +1,19 @@
+---
+# Timezone applied to all managed nodes.
+baseline_timezone: "UTC"
+
+# systemd-journald disk cap (drop-in). Keeps logs from filling a small root disk.
+baseline_journald_max_use: "200M"
+
+# Packages every managed node should have. Pure baseline — app/runtime packages
+# live in their own roles.
+baseline_packages:
+  - qemu-guest-agent
+  - systemd-timesyncd
+  - unattended-upgrades
+  - python3-apt
+
+# Security-net unattended-upgrades: autonomous *security* patching between the
+# orchestrated (alemorvan.patchmanagement) runs. Reboots are owned by the
+# orchestrated patch window, so the daemon must not reboot on its own.
+baseline_unattended_auto_reboot: false
