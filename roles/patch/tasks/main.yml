@@ -1,0 +1,37 @@
+---
+# Native ansible.builtin full patch. Reboots ONLY if the upgrade left
+# /var/run/reboot-required, and NEVER the Ansible controller.
+
+- name: Update apt cache and perform a full distribution upgrade
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+    upgrade: "{{ patch_upgrade }}"
+  register: patch_apt
+  retries: 3
+  delay: 15
+  until: patch_apt is succeeded
+
+- name: Remove unused dependencies
+  ansible.builtin.apt:
+    autoremove: "{{ patch_autoremove }}"
+    purge: "{{ patch_autoremove_purge }}"
+  when: patch_autoremove
+
+- name: Check whether a reboot is required
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: patch_reboot_required
+
+- name: Reboot the node only if required (never the controller)
+  ansible.builtin.reboot:
+    msg: "Reboot initiated by Ansible after package upgrade"
+    reboot_timeout: "{{ patch_reboot_timeout }}"
+    post_reboot_delay: "{{ patch_post_reboot_delay }}"
+    # Default test_command (whoami) is a reachability probe; do NOT use
+    # `systemctl is-system-running` — it returns non-zero on a (common) degraded
+    # boot and would hang until reboot_timeout then fail a healthy host.
+  when:
+    - patch_reboot_required.stat.exists
+    - inventory_hostname not in groups.get('control', [])
+    - ansible_connection | default('ssh') != 'local'

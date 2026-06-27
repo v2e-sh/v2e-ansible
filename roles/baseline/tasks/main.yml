@@ -1,0 +1,91 @@
+---
+# Baseline OS configuration for every managed node. Pure ansible.builtin so it
+# can never fail on a missing collection during the unattended first-boot run.
+
+- name: Install baseline packages
+  ansible.builtin.apt:
+    name: "{{ baseline_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure qemu-guest-agent is enabled and running
+  ansible.builtin.systemd_service:
+    name: qemu-guest-agent
+    enabled: true
+    state: started
+
+# --- Time sync (timedatectl set-ntp enables + starts systemd-timesyncd) ---
+- name: Check current NTP synchronization state
+  ansible.builtin.command: timedatectl show -p NTP --value
+  register: baseline_ntp_state
+  changed_when: false
+  check_mode: false
+
+- name: Enable NTP synchronization
+  ansible.builtin.command: timedatectl set-ntp true
+  when: baseline_ntp_state.stdout | trim != 'yes'
+  changed_when: true
+
+# --- Timezone (timedatectl, guarded for idempotency) ---
+- name: Check current timezone
+  ansible.builtin.command: timedatectl show -p Timezone --value
+  register: baseline_tz_state
+  changed_when: false
+  check_mode: false
+
+- name: Set system timezone
+  ansible.builtin.command: "timedatectl set-timezone {{ baseline_timezone }}"
+  when: baseline_tz_state.stdout | trim != baseline_timezone
+  changed_when: true
+
+# --- journald disk cap ---
+- name: Ensure journald drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Cap systemd-journald disk usage
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/00-size.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (baseline role). Cap journal disk usage.
+      [Journal]
+      SystemMaxUse={{ baseline_journald_max_use }}
+  notify: Restart systemd-journald
+
+# --- unattended-upgrades (security net, no auto-reboot) ---
+# The distro default /etc/apt/apt.conf.d/50unattended-upgrades already restricts
+# to the -security origin, so we only enable the periodic timer and disable reboots.
+- name: Enable periodic unattended-upgrades
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      // Managed by Ansible (baseline role).
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+- name: Disable unattended-upgrades automatic reboot (orchestrated patching owns reboots)
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/52unattended-upgrades-local
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      // Managed by Ansible (baseline role). Security-net auto-upgrades.
+      Unattended-Upgrade::Automatic-Reboot "{{ 'true' if baseline_unattended_auto_reboot else 'false' }}";
+
+- name: Ensure unattended-upgrades is enabled and running
+  ansible.builtin.systemd_service:
+    name: unattended-upgrades
+    enabled: true
+    state: started

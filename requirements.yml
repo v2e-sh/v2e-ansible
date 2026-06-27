@@ -1,7 +1,12 @@
 ---
-# The `docker` role is vendored under roles/docker (from geerlingguy.docker).
-# If you'd rather pull it from Ansible Galaxy instead of vendoring, remove
-# roles/docker and run: ansible-galaxy install -r requirements.yml
-roles:
-  - name: geerlingguy.docker
-    version: "8.0.0"
+# Galaxy sources for v2e-ansible.
+#
+# There are currently NO Galaxy role dependencies to install:
+#   - docker            -> vendored at roles/docker (geerlingguy.docker 8.0.0),
+#                          referenced as `docker`.
+#   - baseline, patch   -> local roles, pure ansible.builtin.
+#
+# When a future phase needs a Galaxy role/collection, add it below and re-enable
+# the `ansible-galaxy install -r requirements.yml -p roles` step in control's
+# cloud-init bootstrap (v2e-tf: cloud-init/node.yaml.tftpl).
+roles: []

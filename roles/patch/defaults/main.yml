@@ -1,0 +1,15 @@
+---
+# On-demand orchestrated full patch (run with: ansible-playbook site.yml --tags patch).
+# Security-only autonomous patching is handled separately by unattended-upgrades
+# (see the baseline role); first-boot patching is handled by cloud-init.
+
+# apt upgrade mode: dist = apt-get dist-upgrade (resolves new kernels/deps).
+patch_upgrade: dist
+patch_autoremove: true
+# Keep config files of auto-removed packages (purge of transitively-removed
+# packages is irreversible; flip to true only if reclaiming orphaned configs).
+patch_autoremove_purge: false
+
+# ansible.builtin.reboot tuning (only used when a reboot is actually required).
+patch_reboot_timeout: 600
+patch_post_reboot_delay: 30

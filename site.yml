@@ -1,15 +1,39 @@
 ---
-# Installs and configures Docker on the control and services hosts
-# using the vendored `docker` role (geerlingguy/ansible-role-docker).
+# Phase 1 baseline. Run FROM the control node (controller = control) as the
+# `ansible` automation user. See README.md.
+#
+#   ping (smoke)  ->  baseline (all)  ->  patch (on demand)  ->  docker (services)
 
-- name: Install Docker on control and services hosts
-  hosts: control:services
+- name: Smoke test — confirm the automation mesh can reach every node
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Ping all managed hosts
+      ansible.builtin.ping:
+
+- name: Baseline configuration on all managed nodes
+  hosts: all
+  become: true
+  roles:
+    - baseline
+
+- name: Orchestrated full patch (on demand — run with --tags patch)
+  hosts: all
+  become: true
+  tags:
+    - patch
+    - never
+  roles:
+    - patch
+
+- name: Install Docker on the services host
+  hosts: services
   become: true
   roles:
     - role: docker
       vars:
         # Keep the Compose v2 plugin (`docker compose ...`) installed.
         docker_install_compose_plugin: true
-        # Users to add to the `docker` group so they can run docker without sudo.
+        # Users to add to the `docker` group (uncomment as needed):
         # docker_users:
-        #   - deploy
+        #   - ansible
