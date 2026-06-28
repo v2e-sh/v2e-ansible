@@ -2,8 +2,8 @@
 # Run FROM the control node (controller = control) as the `ansible` automation
 # user. See README.md.
 #
-#   ping -> baseline -> hardening -> patch (on demand) -> docker (services)
-#   vyos-hardening  (on demand: --tags vyos)
+#   ping -> baseline -> hardening -> ai-identities (linux) -> ai-workbench (agent)
+#   -> patch (on demand) -> docker (services) -> vyos-hardening (on demand: --tags vyos)
 #
 # ansible.builtin plays target the `linux` group (control/services/agent); the
 # VyOS router is a separate network_cli play (--tags vyos), never in linux scope.
@@ -26,6 +26,18 @@
   become: true
   roles:
     - deb-hardening-basic
+
+- name: AI-agent identities across all Linux nodes
+  hosts: linux
+  become: true
+  roles:
+    - ai-identities
+
+- name: AI workbench on the agent node
+  hosts: agent
+  become: true
+  roles:
+    - ai-workbench
 
 - name: Orchestrated full patch (on demand — run with --tags patch)
   hosts: linux
