@@ -1,0 +1,23 @@
+---
+# Restore: remove the kill-switch rules and re-enable the VLAN interface, returning
+# the agent subnet to whatever the base firewall allows. failed_when:false keeps the
+# restore tolerant when a rule / disable isn't present (VyOS errors on deleting a
+# node that doesn't exist), so `allow` is safe to run from any prior state.
+
+- name: Kill switch — release firewall rules
+  vyos.vyos.vyos_config:
+    lines:
+      - "delete firewall ipv4 forward filter rule {{ killswitch_rule_base }}"
+      - "delete firewall ipv4 forward filter rule {{ killswitch_rule_base + 1 }}"
+      - "delete firewall ipv4 forward filter rule {{ killswitch_rule_base + 10 }}"
+    comment: "ansible killswitch allow"
+    save: "{{ killswitch_save }}"
+  failed_when: false
+
+- name: Kill switch — re-enable the agent VLAN interface (if hard-cut)
+  vyos.vyos.vyos_config:
+    lines:
+      - "delete interfaces ethernet {{ killswitch_lan_iface }} vif {{ killswitch_agent_vlan }} disable"
+    comment: "ansible killswitch allow (re-enable iface)"
+    save: "{{ killswitch_save }}"
+  failed_when: false

@@ -1,0 +1,27 @@
+---
+# AI tooling for the agent node: Node.js, Claude Code, Codex, the superpowers
+# plugin, per-account auth, and the `agent-run` headless wrapper used to task an
+# agent from control. Run against the `agent` host (see agents.yml).
+
+# Node.js (NodeSource). Claude Code + Codex are installed as npm globals.
+ai_workbench_node_major: "22"
+ai_workbench_npm_global:
+  - "@anthropic-ai/claude-code"
+  - "@openai/codex"
+
+# Accounts that get the superpowers plugin (a Claude Code plugin). The exact
+# `claude plugin` CLI flags vary by Claude Code version — adjust here if needed.
+ai_workbench_superpowers_accounts:
+  - claude
+ai_workbench_superpowers_marketplace: "obra/superpowers-marketplace"
+ai_workbench_superpowers_plugin: "superpowers@superpowers-marketplace"
+
+# Which accounts authenticate which tool, and the keys. Keys come from an Ansible
+# Vault file (never committed in plaintext); empty = skip auth and log in
+# interactively later, so a run never fails when the vault is absent.
+ai_workbench_anthropic_accounts:
+  - claude
+ai_workbench_codex_accounts:
+  - codex
+ai_workbench_anthropic_api_key: "{{ vault_anthropic_api_key | default('') }}"
+ai_workbench_openai_api_key: "{{ vault_openai_api_key | default('') }}"

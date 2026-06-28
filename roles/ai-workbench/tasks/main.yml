@@ -1,0 +1,105 @@
+---
+# Install + preseed the AI tooling on the agent node. System-wide installs run as
+# root (the play's become); per-account preseeding (plugin, auth, env) runs as each
+# account via become_user.
+
+# --- Node.js (NodeSource apt repo) ---
+- name: Install prerequisites for the NodeSource repo
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - python3-debian
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# apt (>= bookworm) reads ASCII-armored keys directly via signed-by, so no dearmor
+# step is needed.
+- name: Add the NodeSource signing key
+  ansible.builtin.get_url:
+    url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+    dest: /usr/share/keyrings/nodesource.asc
+    mode: "0644"
+
+- name: Add the NodeSource apt repository
+  ansible.builtin.deb822_repository:
+    name: nodesource
+    types: deb
+    uris: "https://deb.nodesource.com/node_{{ ai_workbench_node_major }}.x"
+    suites: nodistro
+    components: main
+    signed_by: /usr/share/keyrings/nodesource.asc
+    state: present
+
+- name: Install Node.js
+  ansible.builtin.apt:
+    name: nodejs
+    state: present
+    update_cache: true
+
+# --- Claude Code + Codex (npm globals, system-wide so every account sees them) ---
+- name: Install the AI CLIs globally
+  community.general.npm:
+    name: "{{ item }}"
+    global: true
+    state: present
+  loop: "{{ ai_workbench_npm_global }}"
+
+# --- superpowers plugin (per Claude account) ---
+# Idempotent: `creates` skips on re-runs once the plugins dir exists, and `|| true`
+# tolerates an already-registered marketplace/plugin. Confirm the plugins path and
+# `claude plugin` flags against the installed Claude Code version.
+- name: Preseed the superpowers marketplace + plugin per account
+  become: true
+  become_user: "{{ item }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    claude plugin marketplace add {{ ai_workbench_superpowers_marketplace }} || true
+    claude plugin install {{ ai_workbench_superpowers_plugin }} || true
+  args:
+    creates: "/home/{{ item }}/.claude/plugins"
+  loop: "{{ ai_workbench_superpowers_accounts }}"
+
+# --- Codex auth (per codex account, only when a key is set) ---
+- name: Authenticate Codex per account
+  become: true
+  become_user: "{{ item }}"
+  ansible.builtin.command:
+    cmd: "codex login --api-key {{ ai_workbench_openai_api_key }}"
+    creates: "/home/{{ item }}/.codex/auth.json"
+  loop: "{{ ai_workbench_codex_accounts }}"
+  when: ai_workbench_openai_api_key | length > 0
+  no_log: true
+
+# --- agent-run env (per anthropic account, only when a key is set) ---
+- name: Ensure the agent-run config dir per account
+  ansible.builtin.file:
+    path: "/home/{{ item }}/.config/agent-run"
+    state: directory
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0700"
+  loop: "{{ ai_workbench_anthropic_accounts }}"
+  when: ai_workbench_anthropic_api_key | length > 0
+
+- name: Write the ANTHROPIC_API_KEY env per account
+  ansible.builtin.template:
+    src: agent-run.env.j2
+    dest: "/home/{{ item }}/.config/agent-run/env"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0600"
+  loop: "{{ ai_workbench_anthropic_accounts }}"
+  when: ai_workbench_anthropic_api_key | length > 0
+  no_log: true
+
+# --- agent-run wrapper (system-wide) ---
+- name: Install the agent-run headless wrapper
+  ansible.builtin.template:
+    src: agent-run.sh.j2
+    dest: /usr/local/bin/agent-run
+    owner: root
+    group: root
+    mode: "0755"

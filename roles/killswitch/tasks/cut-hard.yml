@@ -1,0 +1,11 @@
+---
+# Hard cut: disable the agent VLAN sub-interface on the router. Total blackout —
+# you also lose the control->agent recovery channel. Use only when the surgical cut
+# isn't enough. `allow` (delete ... disable) brings it back.
+
+- name: Kill switch — hard cut (disable the agent VLAN interface)
+  vyos.vyos.vyos_config:
+    lines:
+      - "set interfaces ethernet {{ killswitch_lan_iface }} vif {{ killswitch_agent_vlan }} disable"
+    comment: "ansible killswitch cut-hard"
+    save: "{{ killswitch_save }}"

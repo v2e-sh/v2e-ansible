@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Run an AI agent headless (one-shot). Usage: agent-run <claude|codex> <prompt...>
+# Sources the calling account's env (e.g. ANTHROPIC_API_KEY) when present, then
+# execs the chosen tool in non-interactive mode. Installed by the ai-workbench role.
+set -euo pipefail
+
+tool="${1:-}"
+shift || true
+prompt="$*"
+
+env_file="$HOME/.config/agent-run/env"
+if [ -f "$env_file" ]; then
+  set -a
+  . "$env_file"
+  set +a
+fi
+
+case "$tool" in
+  claude) exec claude -p "$prompt" ;;
+  codex)  exec codex exec "$prompt" ;;
+  *) echo "usage: agent-run <claude|codex> <prompt>" >&2; exit 2 ;;
+esac

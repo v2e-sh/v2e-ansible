@@ -1,0 +1,30 @@
+---
+# Provision the AI-agent identities + workbench. Operator-initiated (NOT part of
+# site.yml's unattended first-boot run). Run from control as the `ansible` user:
+#
+#   ansible-playbook agents.yml
+#
+# SECURITY NOTE — the AI accounts get root (NOPASSWD sudo) on ALL Linux nodes,
+# INCLUDING control. control holds the ansible/v2e SSH keys that reach the VyOS
+# router, so a rooted agent on control can reach the router and re-open its own
+# kill switch. Treat the kill switch as operable OUT-OF-BAND (from the Mac /
+# Proxmox console), and consider retiring control's router-capable keys in a later
+# phase. The AI mesh itself never targets the router.
+
+- name: AI-agent identities across all Linux nodes
+  hosts: linux
+  become: true
+  tags:
+    - ai
+    - ai-identities
+  roles:
+    - ai-identities
+
+- name: AI workbench on the agent node
+  hosts: agent
+  become: true
+  tags:
+    - ai
+    - ai-workbench
+  roles:
+    - ai-workbench

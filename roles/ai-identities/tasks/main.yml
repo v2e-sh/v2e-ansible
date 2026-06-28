@@ -1,0 +1,72 @@
+---
+# Create the AI-agent accounts on every Linux node and wire their SSH mesh. Runs
+# against the `linux` group with the default linear strategy: the hub generates
+# each keypair in an early task and publishes the public key as a fact, then every
+# host reads it from hostvars in a later task of the SAME play. Mirrors the
+# v2e/ansible mesh model from v2e-tf (locals.meshes / node_users).
+
+- name: Create AI-agent accounts
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: sudo
+    append: true
+    shell: "{{ ai_identities_shell }}"
+    password: "{{ ai_identities_password | default(omit, true) }}"
+    create_home: true
+  loop: "{{ ai_identities_roster }}"
+
+- name: Grant NOPASSWD sudo to each AI-agent account
+  community.general.sudoers:
+    name: "10-ai-{{ item }}"
+    user: "{{ item }}"
+    commands: ALL
+    nopassword: "{{ ai_identities_sudo_nopasswd }}"
+    state: present
+  loop: "{{ ai_identities_roster }}"
+
+# --- Key material: generated only on the hub, then published via hostvars ---
+- name: Ensure ~/.ssh exists for each account on the hub
+  ansible.builtin.file:
+    path: "/home/{{ item }}/.ssh"
+    state: directory
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0700"
+  loop: "{{ ai_identities_roster }}"
+  when: inventory_hostname == ai_identities_hub_host
+
+- name: Generate an SSH keypair per account on the hub
+  community.crypto.openssh_keypair:
+    path: "/home/{{ item }}/.ssh/id_ed25519"
+    type: ed25519
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0600"
+    comment: "{{ item }}@v2e-ai"
+  loop: "{{ ai_identities_roster }}"
+  register: ai_identities_keys
+  when: inventory_hostname == ai_identities_hub_host
+
+- name: Publish the hub's public keys as a fact (account -> public key)
+  ansible.builtin.set_fact:
+    ai_identities_pubkeys: >-
+      {{ dict(ai_identities_roster | zip(ai_identities_keys.results | map(attribute='public_key') | list)) }}
+  when: inventory_hostname == ai_identities_hub_host
+
+- name: Write each account's SSH client config on the hub
+  ansible.builtin.template:
+    src: ssh_config.j2
+    dest: "/home/{{ item }}/.ssh/config"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0600"
+  loop: "{{ ai_identities_roster }}"
+  when: inventory_hostname == ai_identities_hub_host
+
+# --- Authorize the hub's public key for each account on EVERY node ---
+- name: Authorize each AI-agent public key on this node
+  ansible.posix.authorized_key:
+    user: "{{ item }}"
+    key: "{{ hostvars[ai_identities_hub_host].ai_identities_pubkeys[item] }}"
+    state: present
+  loop: "{{ ai_identities_roster }}"
