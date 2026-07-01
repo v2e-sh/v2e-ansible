@@ -1,7 +1,19 @@
-# Ansible runtime + local galaxy-install noise. Deps are declared in
-# requirements.yml and installed by CI / control cloud-init in later phases —
-# never committed here.
+# macOS
+.DS_Store
+
+# Ansible runtime artifacts
 *.retry
+fact_cache/
 __pycache__/
+
+# Galaxy deps installed locally / by CI+cloud-init — declared in requirements.yml, never committed
 .galaxy/
 .ansible/
+
+# Vault password files and secrets — never commit
+.vault_pass
+vault-password*
+*.vault
+
+# Local inventory overrides that may hold real hosts/creds
+inventory/*.local.ini
