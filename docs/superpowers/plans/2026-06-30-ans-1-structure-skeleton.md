@@ -523,6 +523,7 @@ git commit -m "site: thin orchestrator importing 01/02/03 phase playbooks"
 - Create: `.ansible-lint`
 - Rename (git mv, dirs): `roles/ai-identities`→`roles/ai_identities`, `roles/ai-workbench`→`roles/ai_workbench`, `roles/deb-hardening-basic`→`roles/deb_hardening_basic`, `roles/dev-tools`→`roles/dev_tools`, `roles/vyos-hardening-basic`→`roles/vyos_hardening_basic`
 - Modify references: `playbooks/01-bootstrap.yml`, `playbooks/03-applications.yml`, `playbooks/ops/vyos-hardening.yml`, `playbooks/ops/agents.yml`, and the 5 renamed roles' `README.md` H1 headings
+- Refresh: `README.md` `## Layout` tree (carried over from Task 6) — currently still shows the pre-refactor root-level playbooks and hyphenated role names; update it to the final structure.
 
 **Interfaces:**
 - Consumes: the full restructured tree from Tasks 5–7.
@@ -566,6 +567,11 @@ Then confirm no stale hyphenated references remain:
 grep -rnE '\b(ai-identities|ai-workbench|deb-hardening-basic|dev-tools|vyos-hardening-basic)\b' site.yml playbooks/ roles/*/README.md
 ```
 Expected: no matches (update any README H1 headings the grep surfaces, e.g. `# dev-tools` → `# dev_tools`).
+
+- [ ] **Step 4b: Refresh the top-level `README.md` `## Layout` tree**
+
+The `## Layout` block in `README.md` still lists the pre-refactor structure (root-level `agents.yml`/`killswitch.yml`/`task-agent.yml`, hyphenated role names, no `playbooks/` tree). Rewrite it to reflect the final layout: `site.yml` (thin orchestrator), `playbooks/01-bootstrap.yml`/`02-services.yml`/`03-applications.yml`, `playbooks/ops/` (killswitch, patch, vyos-hardening, agents, task-agent), and the roles under their underscore names (`ai_identities`, `ai_workbench`, `deb_hardening_basic`, `dev_tools`, `health_check`, `vyos_hardening_basic`, plus `baseline`, `docker`, `killswitch`, `patch`). Keep the one-line description style already used in that block.
+Verify: `grep -nE '^(agents|killswitch|task-agent)\.yml' README.md` returns nothing (no root-level playbook entries remain in the tree).
 
 - [ ] **Step 5: Verify repo-wide lint is clean**
 
