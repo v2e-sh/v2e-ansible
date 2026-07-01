@@ -1,0 +1,521 @@
+# ANS-1 Structure + Skeleton Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Restructure `v2e-ansible` into a clean, testable skeleton — a thin `site.yml` importing three ordered phase playbooks, standalone tag-gated operational playbooks under `playbooks/ops/`, declared `requirements.yml`, a phase-ready `ansible.cfg`, and two scaffolded roles — without changing any role behaviour.
+
+**Architecture:** `site.yml` becomes a pure orchestrator (`import_playbook` of `01-bootstrap` → `02-services` → `03-applications`). Today's inline plays are carved into those phase files; the on-demand `patch`/`vyos` plays and the existing standalone playbooks move to `playbooks/ops/`. Existing roles are wired in **unchanged** as transitional placeholders so a `--check` dry-run stays green; ANS-2/ANS-3 replace the bodies.
+
+**Tech Stack:** Ansible (ansible-core), `ansible-lint`, `ansible-galaxy`, vyos.vyos + community.sops/community.docker/devsec.hardening collections (declared, installed to a gitignored path for verification only).
+
+## Global Constraints
+
+- Branch: `refactor/ansible-structure` (already created off `ai-agents`).
+- **Pure skeleton** — no role-body swaps, no devsec/geerlingguy wiring, no SOPS secret content. Structure only.
+- Existing roles (`baseline`, `deb-hardening-basic`, `docker`, `ai-*`, `killswitch`, `patch`, `vyos-hardening-basic`) are left **byte-unchanged**.
+- `import_playbook` paths are relative to `site.yml` (repo root); roles resolve via `roles_path`.
+- Galaxy deps are **declared and installed only to a gitignored `.galaxy/` path** — nothing installed is committed.
+- Git: short commit messages, no attribution trailer (user convention).
+- Acceptance for the whole plan: `ansible-playbook --syntax-check site.yml`, `ansible-lint`, and `ansible-playbook --check site.yml` all pass; the three `playbooks/ops/` router/patch playbooks resolve standalone; `v2e-tf.git/` is gone.
+
+---
+
+### Task 1: Git hygiene — remove stray bare repo, add `.gitignore`
+
+**Files:**
+- Delete: `v2e-tf.git/` (stray bare mirror of the separate `v2e-tf` project)
+- Create: `.gitignore`
+
+- [ ] **Step 1: Confirm the stray repo is untracked and unignored**
+
+Run: `git -C /Users/alex/Documents/v2e-environment/v2e-ansible status --porcelain v2e-tf.git | head`
+Expected: a line beginning `??` (untracked), confirming it is not part of history.
+
+- [ ] **Step 2: Delete the stray bare repo**
+
+```bash
+cd /Users/alex/Documents/v2e-environment/v2e-ansible
+rm -rf v2e-tf.git
+```
+
+- [ ] **Step 3: Create `.gitignore`**
+
+```gitignore
+# Galaxy deps installed locally for verification (declared in requirements.yml,
+# installed by CI / control cloud-init in later phases — never committed here).
+.galaxy/
+
+# Ansible runtime noise
+*.retry
+__pycache__/
+```
+
+- [ ] **Step 4: Verify the stray repo is gone and nothing bare remains**
+
+Run: `ls -d v2e-tf.git 2>&1; git status --porcelain | grep -c 'v2e-tf.git'`
+Expected: `ls` reports "No such file or directory"; the grep count is `0`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .gitignore
+git commit -m "chore: drop stray v2e-tf.git mirror; add .gitignore"
+```
+
+---
+
+### Task 2: Declare Galaxy dependencies in `requirements.yml`
+
+**Files:**
+- Modify: `requirements.yml` (currently `roles: []`)
+
+**Interfaces:**
+- Produces: a `requirements.yml` installable by `ansible-galaxy install -r requirements.yml`; `community.sops` must be resolvable so the vars plugin enabled in Task 3 loads.
+
+- [ ] **Step 1: Write `requirements.yml`**
+
+```yaml
+---
+# Galaxy dependencies for v2e-ansible. Declared here for later phases; installed by
+# CI / control cloud-init via:  ansible-galaxy install -r requirements.yml
+#
+# NOTE: geerlingguy.docker is pinned to the 7.x line per the master plan, while
+# roles/docker is a vendored 8.0.0 copy. Reconcile at ANS-3 (the docker swap).
+roles:
+  - name: geerlingguy.docker
+    version: "7.4.1"
+  - name: artis3n.tailscale
+    version: "5.4.4"
+
+collections:
+  - name: community.docker
+    version: ">=3.0.0"
+  - name: devsec.hardening
+    version: ">=10.0.0,<11.0.0"
+  - name: community.sops
+    version: ">=1.6.0"
+```
+
+- [ ] **Step 2: Install into the gitignored path to verify resolvability**
+
+Run:
+```bash
+ansible-galaxy install -r requirements.yml \
+  --roles-path .galaxy/roles \
+  && ansible-galaxy collection install -r requirements.yml -p .galaxy/collections
+```
+Expected: both complete without error; `.galaxy/roles/geerlingguy.docker` and `.galaxy/collections/ansible_collections/community/sops` exist.
+
+If a **role** version is rejected as non-existent, find the current 7.x / latest tag and correct the pin, then re-run:
+```bash
+ansible-galaxy role info geerlingguy.docker | grep -iE '^\s*version'
+ansible-galaxy role info artis3n.tailscale | grep -iE '^\s*version'
+```
+
+- [ ] **Step 3: Confirm `.galaxy/` is ignored (not staged)**
+
+Run: `git status --porcelain .galaxy`
+Expected: empty output (ignored by Task 1's `.gitignore`).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add requirements.yml
+git commit -m "deps: declare galaxy roles/collections for later phases"
+```
+
+---
+
+### Task 3: Extend `ansible.cfg` for later phases (collections, SOPS, SFTP)
+
+**Files:**
+- Modify: `ansible.cfg`
+
+**Interfaces:**
+- Consumes: `community.sops` installed to `.galaxy/collections` (Task 2).
+- Produces: `collections_path` including `.galaxy/collections`; the SOPS vars plugin enabled; SFTP transfer set.
+
+- [ ] **Step 1: Verify the SOPS vars plugin is currently NOT enabled**
+
+Run: `ansible-config dump --only-changed 2>/dev/null | grep -i vars_plugins_enabled || echo "not set"`
+Expected: `not set`.
+
+- [ ] **Step 2: Write the updated `ansible.cfg`**
+
+```ini
+[defaults]
+inventory = inventory/hosts.ini
+roles_path = roles:.galaxy/roles
+collections_path = .galaxy/collections
+host_key_checking = False
+retry_files_enabled = False
+stdout_callback = default
+result_format = yaml
+# SOPS-encrypted group/host vars are auto-decrypted by the community.sops vars
+# plugin (used from ANS-2). host_group_vars stays enabled for plain vars.
+vars_plugins_enabled = host_group_vars,community.sops.sops
+
+[privilege_escalation]
+become = True
+become_method = sudo
+
+[ssh_connection]
+# devsec.hardening (ANS-2) sets sftp_enabled: true; use SFTP for file transfer so
+# Ansible copies keep working after hardening.
+ssh_transfer_method = sftp
+```
+
+- [ ] **Step 3: Verify the config loads and the vars plugin resolves**
+
+Run: `ansible-config dump --only-changed 2>&1 | grep -iE 'vars_plugins_enabled|transfer_method|collections_path'`
+Expected: shows `community.sops.sops`, `sftp`, and the `.galaxy/collections` path — with **no** "vars plugin not found" error above them.
+
+- [ ] **Step 4: Smoke-check that a trivial local play still runs (plugin loads cleanly)**
+
+Run: `ansible localhost -m ansible.builtin.ping -o 2>&1 | tail -1`
+Expected: `localhost | SUCCESS => {"changed": false, "ping": "pong"}` (no vars-plugin traceback).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add ansible.cfg
+git commit -m "config: add collections_path, SOPS vars plugin, sftp transfer"
+```
+
+---
+
+### Task 4: Scaffold `health_check` and `dev-tools` roles
+
+**Files:**
+- Create: `roles/health_check/tasks/main.yml`, `roles/health_check/defaults/main.yml`, `roles/health_check/README.md`
+- Create: `roles/dev-tools/tasks/main.yml`, `roles/dev-tools/defaults/main.yml`, `roles/dev-tools/README.md`
+
+**Interfaces:**
+- Produces: role `health_check` (wired into `01-bootstrap` in Task 5) and role `dev-tools` (created, left unwired). Both are no-ops in ANS-1.
+
+- [ ] **Step 1: Create `roles/health_check/tasks/main.yml`**
+
+```yaml
+---
+# ANS-1 scaffold. ANS-2 fills this with the real fail-fast gate:
+#   mesh wait_for_connection, disk/memory asserts, inter-VLAN reachability.
+- name: Health check placeholder (ANS-1 scaffold — no assertions yet)
+  ansible.builtin.debug:
+    msg: "health_check: scaffold — real checks land in ANS-2"
+```
+
+- [ ] **Step 2: Create `roles/health_check/defaults/main.yml`**
+
+```yaml
+---
+# Thresholds for ANS-2 (min free disk %, min free memory MB, VLANs to probe).
+# Declared empty in ANS-1.
+```
+
+- [ ] **Step 3: Create `roles/health_check/README.md`**
+
+```markdown
+# health_check
+
+Fail-fast preflight gate, run first in `01-bootstrap`. **ANS-1: scaffold only.**
+ANS-2 adds mesh `wait_for_connection`, disk/memory asserts, and inter-VLAN
+reachability so the rest of the run aborts early on an unhealthy node.
+```
+
+- [ ] **Step 4: Create `roles/dev-tools/tasks/main.yml`**
+
+```yaml
+---
+# ANS-1 scaffold. ANS-2 installs the CLI toolset (ripgrep, fd, fzf, bat, eza, jq,
+# yq, tmux, lazygit, zoxide, delta, hyperfine, tldr, dust, duf, btop, ncdu) on
+# control (optionally other nodes). Left UNWIRED in ANS-1.
+- name: Dev-tools placeholder (ANS-1 scaffold — installs nothing yet)
+  ansible.builtin.debug:
+    msg: "dev-tools: scaffold — toolset install lands in ANS-2"
+```
+
+- [ ] **Step 5: Create `roles/dev-tools/defaults/main.yml`**
+
+```yaml
+---
+# ANS-2: dev_tools_packages list + target-node toggles. Declared empty in ANS-1.
+```
+
+- [ ] **Step 6: Create `roles/dev-tools/README.md`**
+
+```markdown
+# dev-tools
+
+Developer CLI toolset for control (optionally other nodes). **ANS-1: scaffold
+only, not wired into any phase playbook.** ANS-2 populates the package list and
+decides placement.
+```
+
+- [ ] **Step 7: Verify both roles lint clean**
+
+Run: `ansible-lint roles/health_check roles/dev-tools`
+Expected: passes with no errors (warnings about `debug` are acceptable; no failures).
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add roles/health_check roles/dev-tools
+git commit -m "roles: scaffold health_check and dev-tools (no-op)"
+```
+
+---
+
+### Task 5: Create the three phase playbooks
+
+**Files:**
+- Create: `playbooks/01-bootstrap.yml`, `playbooks/02-services.yml`, `playbooks/03-applications.yml`
+
+**Interfaces:**
+- Consumes: roles `health_check` (Task 4), `baseline`, `deb-hardening-basic`, `docker`, `ai-identities`, `ai-workbench` (existing).
+- Produces: three playbooks imported by `site.yml` in Task 7.
+
+- [ ] **Step 1: Create `playbooks/01-bootstrap.yml`**
+
+```yaml
+---
+# Phase 01 — bootstrap: reachability + baseline OS + basic hardening on every
+# Linux node. Imported first by site.yml; health_check runs first as the
+# fail-fast gate (real assertions arrive in ANS-2).
+
+- name: Smoke test — confirm the automation mesh can reach every node
+  hosts: linux
+  gather_facts: false
+  tasks:
+    - name: Ping all managed hosts
+      ansible.builtin.ping:
+
+- name: Health checks (fail-fast gate)
+  hosts: linux
+  become: true
+  roles:
+    - health_check
+
+- name: Baseline configuration on all Linux nodes
+  hosts: linux
+  become: true
+  roles:
+    - baseline
+
+- name: Basic system hardening on all Linux nodes
+  hosts: linux
+  become: true
+  roles:
+    - deb-hardening-basic
+```
+
+- [ ] **Step 2: Create `playbooks/02-services.yml`**
+
+```yaml
+---
+# Phase 02 — services: container runtime on the services node.
+# Vendored docker role unchanged (geerlingguy swap is ANS-3).
+
+- name: Install Docker on the services host
+  hosts: services
+  become: true
+  roles:
+    - role: docker
+      vars:
+        # Keep the Compose v2 plugin (`docker compose ...`) installed.
+        docker_install_compose_plugin: true
+```
+
+- [ ] **Step 3: Create `playbooks/03-applications.yml`**
+
+```yaml
+---
+# Phase 03 — applications: AI-agent identities (all Linux) + workbench (agent).
+
+- name: AI-agent identities across all Linux nodes
+  hosts: linux
+  become: true
+  roles:
+    - ai-identities
+
+- name: AI workbench on the agent node
+  hosts: agent
+  become: true
+  roles:
+    - ai-workbench
+```
+
+- [ ] **Step 4: Verify each phase playbook is syntactically valid**
+
+Run:
+```bash
+for p in playbooks/01-bootstrap.yml playbooks/02-services.yml playbooks/03-applications.yml; do
+  echo "== $p =="; ansible-playbook --syntax-check "$p"; done
+```
+Expected: each prints its play list with no error (roles resolve via `roles_path`).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add playbooks/01-bootstrap.yml playbooks/02-services.yml playbooks/03-applications.yml
+git commit -m "playbooks: carve site.yml into 01/02/03 phase playbooks"
+```
+
+---
+
+### Task 6: Move and create the standalone operational playbooks
+
+**Files:**
+- Move: `killswitch.yml` → `playbooks/ops/killswitch.yml`
+- Move: `agents.yml` → `playbooks/ops/agents.yml`
+- Move: `task-agent.yml` → `playbooks/ops/task-agent.yml`
+- Create: `playbooks/ops/patch.yml`, `playbooks/ops/vyos-hardening.yml`
+- Modify: `README.md` (run-command paths)
+
+**Interfaces:**
+- Consumes: roles `killswitch`, `patch`, `vyos-hardening-basic`, `ai-identities`, `ai-workbench` (existing).
+- Produces: five standalone playbooks under `playbooks/ops/`, none imported by `site.yml`.
+
+- [ ] **Step 1: Move the three existing standalone playbooks (preserve history)**
+
+```bash
+mkdir -p playbooks/ops
+git mv killswitch.yml playbooks/ops/killswitch.yml
+git mv agents.yml     playbooks/ops/agents.yml
+git mv task-agent.yml playbooks/ops/task-agent.yml
+```
+
+- [ ] **Step 2: Create `playbooks/ops/patch.yml`** (carved from the `--tags patch` play)
+
+```yaml
+---
+# Standalone operational — orchestrated full patch. Run explicitly from control:
+#   ansible-playbook playbooks/ops/patch.yml            # patch all Linux nodes
+#   ansible-playbook playbooks/ops/patch.yml --tags patch --limit services
+# Reboots only nodes that need it, never the controller (see roles/patch).
+
+- name: Orchestrated full patch
+  hosts: linux
+  become: true
+  tags:
+    - patch
+  roles:
+    - patch
+```
+
+- [ ] **Step 3: Create `playbooks/ops/vyos-hardening.yml`** (carved from the `--tags vyos` play)
+
+```yaml
+---
+# Standalone operational — VyOS router hardening (network_cli). Run explicitly:
+#   ansible-playbook playbooks/ops/vyos-hardening.yml
+#   ansible-playbook playbooks/ops/vyos-hardening.yml --tags vyos
+# Every line in the role is safe over a key-based session (see roles/vyos-hardening-basic).
+
+- name: VyOS router hardening
+  hosts: vyos
+  gather_facts: false
+  tags:
+    - vyos
+  roles:
+    - vyos-hardening-basic
+```
+
+- [ ] **Step 4: Update run-command paths in `README.md`**
+
+Find every `ansible-playbook killswitch.yml`, `ansible-playbook agents.yml`, `ansible-playbook task-agent.yml`, and any `site.yml --tags patch` / `site.yml --tags vyos` reference, and repoint them:
+
+```bash
+grep -rnE 'ansible-playbook (killswitch|agents|task-agent)\.yml|site\.yml --tags (patch|vyos)' README.md
+```
+Then edit each hit to the new path, e.g.:
+- `ansible-playbook killswitch.yml --tags cut` → `ansible-playbook playbooks/ops/killswitch.yml --tags cut`
+- `ansible-playbook site.yml --tags patch` → `ansible-playbook playbooks/ops/patch.yml`
+- `ansible-playbook site.yml --tags vyos` → `ansible-playbook playbooks/ops/vyos-hardening.yml`
+
+Expected after re-running the grep: no stale root-level `killswitch.yml`/`agents.yml`/`task-agent.yml` invocations and no `site.yml --tags patch|vyos` remain.
+
+- [ ] **Step 5: Verify all five ops playbooks resolve standalone**
+
+Run:
+```bash
+for p in playbooks/ops/*.yml; do echo "== $p =="; ansible-playbook --syntax-check "$p"; done
+```
+Expected: each of `killswitch.yml`, `agents.yml`, `task-agent.yml`, `patch.yml`, `vyos-hardening.yml` syntax-checks with no error.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add playbooks/ops README.md
+git commit -m "playbooks: move ops playbooks under playbooks/ops; add patch + vyos-hardening"
+```
+
+---
+
+### Task 7: Rewrite `site.yml` as the thin orchestrator + full acceptance
+
+**Files:**
+- Modify: `site.yml` (replace inline plays with imports)
+
+**Interfaces:**
+- Consumes: `playbooks/01-bootstrap.yml`, `playbooks/02-services.yml`, `playbooks/03-applications.yml` (Task 5).
+
+- [ ] **Step 1: Confirm the pre-rewrite dry-run baseline still works**
+
+Run: `ansible-playbook --syntax-check site.yml`
+Expected: passes (old inline `site.yml` still valid). This is the "before" baseline.
+
+- [ ] **Step 2: Replace `site.yml` with the orchestrator**
+
+```yaml
+---
+# Unattended first-boot entry point. Run FROM control as the `ansible` user
+# (see README). Statically imports the phase playbooks in order; health_check in
+# 01-bootstrap is the fail-fast gate.
+#
+# Operational playbooks are NOT imported here — run them explicitly from
+# playbooks/ops/ (killswitch, patch, vyos-hardening, agents, task-agent).
+
+- import_playbook: playbooks/01-bootstrap.yml
+- import_playbook: playbooks/02-services.yml
+- import_playbook: playbooks/03-applications.yml
+```
+
+- [ ] **Step 3: Syntax-check the orchestrator resolves all imports + roles**
+
+Run: `ansible-playbook --syntax-check site.yml`
+Expected: prints the combined play list from all three phase playbooks; no "Could not find" errors.
+
+- [ ] **Step 4: Lint the whole tree**
+
+Run: `ansible-lint`
+Expected: no failures (pre-existing warnings on unchanged roles are acceptable; no NEW errors from the restructure).
+
+- [ ] **Step 5: Full dry-run resolves every play/role**
+
+Run: `ansible-playbook --check site.yml 2>&1 | tail -20`
+Expected: plays resolve and execute in check mode. Tasks may report `unreachable` if the env isn't running — that is acceptable (the goal is resolution, not live convergence). There must be **no** "role not found", "playbook not found", or vars-plugin errors.
+
+- [ ] **Step 6: Confirm the acceptance checklist end-to-end**
+
+Run:
+```bash
+echo "== stray repo gone ==";      ls -d v2e-tf.git 2>&1
+echo "== site syntax ==";          ansible-playbook --syntax-check site.yml >/dev/null && echo OK
+echo "== ops standalone ==";       for p in playbooks/ops/patch.yml playbooks/ops/vyos-hardening.yml playbooks/ops/killswitch.yml; do ansible-playbook --syntax-check "$p" >/dev/null && echo "OK $p"; done
+```
+Expected: `ls` → "No such file"; `site syntax` → `OK`; three `OK playbooks/ops/...` lines.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add site.yml
+git commit -m "site: thin orchestrator importing 01/02/03 phase playbooks"
+```
+
+---
+
+## Self-review notes
+
+- **Spec coverage:** git hygiene (T1) · requirements.yml pins incl. 7.x/8.0.0 note (T2) · ansible.cfg collections+SOPS+SFTP (T3) · health_check/dev-tools scaffold, dev-tools unwired (T4) · phase playbooks (T5) · ops move + patch/vyos-hardening + README (T6) · thin site.yml + acceptance (T7). All spec sections mapped.
+- **Placeholder scan:** role bodies are intentionally no-op scaffolds (labelled ANS-1 scaffold), not plan placeholders; every code/command step is concrete. The only runtime-dependent value is the two Galaxy role version pins — Task 2 Step 2 gives the exact lookup+correct procedure if a pin is stale.
+- **Consistency:** role names (`health_check`, `dev-tools`, `deb-hardening-basic`, `vyos-hardening-basic`), playbook paths (`playbooks/…`, `playbooks/ops/…`), and `roles_path`/`collections_path` values match across all tasks.
