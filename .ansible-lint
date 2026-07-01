@@ -1,5 +1,6 @@
 ---
-# roles/docker is vendored upstream (geerlingguy.docker 8.0.0), replaced wholesale
-# by the pinned Galaxy role in ANS-3. Vendored dependencies are not ours to lint.
+# Galaxy-installed roles are upstream dependencies — not ours to lint.
+# artis3n.tailscale excluded for the same reason when it lands.
 exclude_paths:
-  - roles/docker/
+  - roles/geerlingguy.docker/
+  - roles/artis3n.tailscale/
