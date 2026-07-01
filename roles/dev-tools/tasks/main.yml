@@ -1,0 +1,7 @@
+---
+# ANS-1 scaffold. ANS-2 installs the CLI toolset (ripgrep, fd, fzf, bat, eza, jq,
+# yq, tmux, lazygit, zoxide, delta, hyperfine, tldr, dust, duf, btop, ncdu) on
+# control (optionally other nodes). Left UNWIRED in ANS-1.
+- name: Dev-tools placeholder (ANS-1 scaffold — installs nothing yet)
+  ansible.builtin.debug:
+    msg: "dev-tools: scaffold — toolset install lands in ANS-2"

@@ -1,0 +1,6 @@
+---
+# ANS-1 scaffold. ANS-2 fills this with the real fail-fast gate:
+#   mesh wait_for_connection, disk/memory asserts, inter-VLAN reachability.
+- name: Health check placeholder (ANS-1 scaffold — no assertions yet)
+  ansible.builtin.debug:
+    msg: "health_check: scaffold — real checks land in ANS-2"
