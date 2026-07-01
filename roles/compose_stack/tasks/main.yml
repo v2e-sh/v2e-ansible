@@ -61,12 +61,16 @@
         groups: docker
         append: true
 
-    - name: Group-own the stack dir (docker) with group rwX so the operator can read/edit
-      ansible.builtin.file:
-        path: "{{ compose_stack_dir }}"
-        group: docker
-        mode: g+rwX
-        recurse: true
+    # Group-own by docker + group rwX so the operator can read/edit the compose files,
+    # but EXCLUDE any runtime data dir (e.g. traefik/data holds acme.json, which Traefik
+    # refuses unless it is 0600 — a blanket recurse would break cert issuance). chgrp is
+    # safe on those files (group has no access at 0600); only the mode must be left alone.
+    - name: Group-own the stack tree by docker (source rwX; runtime data untouched)
+      ansible.builtin.shell:
+        cmd: >-
+          chgrp -R docker {{ compose_stack_dir | quote }} &&
+          find {{ compose_stack_dir | quote }} -path '*/data' -prune -o -exec chmod g+rwX {} +
+      changed_when: false
 
     - name: Symlink the stack into the operator's home (~/v2e-compose)
       ansible.builtin.file:
