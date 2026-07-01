@@ -2,8 +2,7 @@
 # Galaxy dependencies for v2e-ansible. Declared here for later phases; installed by
 # CI / control cloud-init via:  ansible-galaxy install -r requirements.yml
 #
-# NOTE: geerlingguy.docker is pinned to the 7.x line per the master plan, while
-# roles/docker is a vendored 8.0.0 copy. Reconcile at ANS-3 (the docker swap).
+# All roles/collections pinned EXACT for reproducibility; bump via Renovate or a deliberate commit.
 roles:
   - name: geerlingguy.docker
     version: "7.9.0"
