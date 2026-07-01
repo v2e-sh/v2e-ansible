@@ -1,0 +1,6 @@
+# Ansible runtime + local galaxy-install noise. Deps are declared in
+# requirements.yml and installed by CI / control cloud-init in later phases —
+# never committed here.
+*.retry
+__pycache__/
+.galaxy/
