@@ -7,7 +7,7 @@ jobs:
   ansible:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: python -m pip install ansible
       - run: ansible-playbook --syntax-check -i inventory/hosts.ini site.yml
 
@@ -16,7 +16,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: python -m pip install ansible ansible-lint yamllint
       - run: yamllint . || echo "::warning::yamllint reported findings (advisory)"
       - run: ansible-lint || echo "::warning::ansible-lint reported findings (advisory)"
@@ -25,7 +25,7 @@ jobs:
   secret-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: TruffleHog
         run: |
           docker run --rm -v "$PWD:/repo" trufflesecurity/trufflehog:latest \
