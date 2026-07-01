@@ -1,12 +1,19 @@
 ---
-# Galaxy sources for v2e-ansible.
+# Galaxy dependencies for v2e-ansible. Declared here for later phases; installed by
+# CI / control cloud-init via:  ansible-galaxy install -r requirements.yml
 #
-# There are currently NO Galaxy role dependencies to install:
-#   - docker            -> vendored at roles/docker (geerlingguy.docker 8.0.0),
-#                          referenced as `docker`.
-#   - baseline, patch   -> local roles, pure ansible.builtin.
-#
-# When a future phase needs a Galaxy role/collection, add it below and re-enable
-# the `ansible-galaxy install -r requirements.yml -p roles` step in control's
-# cloud-init bootstrap (v2e-tf: cloud-init/node.yaml.tftpl).
-roles: []
+# NOTE: geerlingguy.docker is pinned to the 7.x line per the master plan, while
+# roles/docker is a vendored 8.0.0 copy. Reconcile at ANS-3 (the docker swap).
+roles:
+  - name: geerlingguy.docker
+    version: "7.9.0"
+  - name: artis3n.tailscale
+    version: "v5.0.1"
+
+collections:
+  - name: community.docker
+    version: ">=3.0.0"
+  - name: devsec.hardening
+    version: ">=10.0.0,<11.0.0"
+  - name: community.sops
+    version: ">=1.6.0"
