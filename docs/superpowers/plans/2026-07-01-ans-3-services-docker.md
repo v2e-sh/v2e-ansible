@@ -13,8 +13,8 @@
 - Branch `feat/ansible-services-docker` (already created off `feat/ansible-bootstrap`).
 - Services node only. Deploy stacks: `[traefik, tinyauth, whoami]`.
 - Engine: `geerlingguy.docker` **7.9.0** (requirements pin); `docker_users: ["ansible"]`; `docker_daemon_options` = json-file log rotation (max-size 10m, max-file 3) + `live-restore: true`.
-- `community.docker` requirements floor bumped to **`>=3.6.0`** (the floor with `docker_compose_v2`).
-- **Galaxy ROLES install to the gitignored `.galaxy/roles`** — `ansible.cfg` `roles_path = roles:.galaxy/roles`; the repo's `roles/` holds ONLY our roles (no upstream Galaxy copies committed or lint-scanned). Cloud-init installs Galaxy deps there at runtime (Task 6).
+- **All Galaxy deps pinned to EXACT versions** in `requirements.yml` (reproducibility; Renovate bumps them later — no ranges): `geerlingguy.docker 7.9.0`, `artis3n.tailscale v5.0.1`, `community.docker 5.2.0` (has `docker_compose_v2`), `devsec.hardening 10.6.0`, `community.sops 2.3.0`.
+- **Galaxy ROLES install to the gitignored `.galaxy/roles`** — `ansible.cfg` `roles_path = .galaxy/roles:roles` (gitignored dir FIRST, so a bare `ansible-galaxy install` lands there and can never re-pollute `roles/`). The repo's `roles/` holds ONLY our roles (no upstream Galaxy copies committed or lint-scanned). Cloud-init installs Galaxy deps at runtime (Task 6).
 - `compose_stack_dir` = `/opt/v2e-compose` (root:root). Repo cloned from HTTPS `https://github.com/v2e-sh/v2e-compose.git`, `version: main`.
 - Secrets from SOPS `group_vars/all.yml`: `cf_dns_api_token`, `tinyauth_auth_users` → mapped to `CF_DNS_API_TOKEN` / `TINYAUTH_AUTH_USERS`. Fail-fast if blank.
 - Non-secret config in `group_vars/services.yml`: `DOMAIN`, `ACME_EMAIL`, `CERT_RESOLVER: staging`.
@@ -354,7 +354,7 @@ In the control ansible-bootstrap runcmd (the `su - ${ansible_user} -c '... git c
 ```bash
 { [ -f requirements.yml ] && { ansible-galaxy role install -r requirements.yml -p .galaxy/roles; ansible-galaxy collection install -r requirements.yml; } || true; } && \
 ```
-Keep it on the same `&&` chain so a failure aborts before the playbook. `-p .galaxy/roles` matches the repo's `roles_path = roles:.galaxy/roles`; collections go to the default `~/.ansible/collections`.
+Keep it on the same `&&` chain so a failure aborts before the playbook. `-p .galaxy/roles` matches the repo's `roles_path = .galaxy/roles:roles`; collections go to the default `~/.ansible/collections`.
 
 - [ ] **Step 3: Validate**
 
