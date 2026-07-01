@@ -14,6 +14,7 @@
 - Services node only. Deploy stacks: `[traefik, tinyauth, whoami]`.
 - Engine: `geerlingguy.docker` **7.9.0** (requirements pin); `docker_users: ["ansible"]`; `docker_daemon_options` = json-file log rotation (max-size 10m, max-file 3) + `live-restore: true`.
 - `community.docker` requirements floor bumped to **`>=3.6.0`** (the floor with `docker_compose_v2`).
+- **Galaxy ROLES install to the gitignored `.galaxy/roles`** — `ansible.cfg` `roles_path = roles:.galaxy/roles`; the repo's `roles/` holds ONLY our roles (no upstream Galaxy copies committed or lint-scanned). Cloud-init installs Galaxy deps there at runtime (Task 6).
 - `compose_stack_dir` = `/opt/v2e-compose` (root:root). Repo cloned from HTTPS `https://github.com/v2e-sh/v2e-compose.git`, `version: main`.
 - Secrets from SOPS `group_vars/all.yml`: `cf_dns_api_token`, `tinyauth_auth_users` → mapped to `CF_DNS_API_TOKEN` / `TINYAUTH_AUTH_USERS`. Fail-fast if blank.
 - Non-secret config in `group_vars/services.yml`: `DOMAIN`, `ACME_EMAIL`, `CERT_RESOLVER: staging`.
@@ -327,6 +328,44 @@ Run at the full from-scratch deploy (real domain + Cloudflare token + age key + 
 ```bash
 git add docs/superpowers/plans/ans-3-live-test-plan.md
 git commit -m "docs: ANS-3 live-env test plan"
+```
+
+---
+
+### Task 6: Cloud-init installs Galaxy deps at runtime (v2e-tf, cross-repo)
+
+**Context:** cloud-init currently clones v2e-ansible and runs the playbook but **never installs
+`requirements.yml`**, so `geerlingguy.docker` (a Galaxy role) is absent on control at deploy time
+and the ANS-3 services play fails with "role not found". This task adds the install step.
+
+**Files (in the `v2e-tf` repo at `/Users/alex/Documents/v2e-environment/v2e-tf`):**
+- Modify: `cloud-init/node.yaml.tftpl` (the ansible bootstrap runcmd on control)
+
+- [ ] **Step 1: Branch in v2e-tf**
+
+```bash
+cd /Users/alex/Documents/v2e-environment/v2e-tf
+git checkout -b feat/cloud-init-galaxy-install
+```
+
+- [ ] **Step 2: Add the Galaxy install before the playbook run**
+
+In the control ansible-bootstrap runcmd (the `su - ${ansible_user} -c '... git clone ... && cd ~/ansible && ... ansible-playbook ...'` line), insert a requirements install **after `cd ~/ansible`** and **before** the `ansible-playbook` invocation, gated on the repo having a `requirements.yml`:
+```bash
+{ [ -f requirements.yml ] && { ansible-galaxy role install -r requirements.yml -p .galaxy/roles; ansible-galaxy collection install -r requirements.yml; } || true; } && \
+```
+Keep it on the same `&&` chain so a failure aborts before the playbook. `-p .galaxy/roles` matches the repo's `roles_path = roles:.galaxy/roles`; collections go to the default `~/.ansible/collections`.
+
+- [ ] **Step 3: Validate**
+
+Run: `export PATH="/opt/homebrew/bin:$PATH"; tofu fmt && tofu validate`
+Expected: `fmt` clean; `validate` → "Success! The configuration is valid." Confirm the string is present: `grep -c 'ansible-galaxy role install -r requirements.yml' cloud-init/node.yaml.tftpl` → `1`.
+
+- [ ] **Step 4: Commit (in v2e-tf)**
+
+```bash
+git add cloud-init/node.yaml.tftpl
+git commit -m "cloud-init: install galaxy requirements before the playbook run"
 ```
 
 ---
