@@ -12,11 +12,12 @@
 
 - Branch: `refactor/ansible-structure` (already created off `ai-agents`).
 - **Pure skeleton** — no role-body swaps, no devsec/geerlingguy wiring, no SOPS secret content. Structure only.
-- Existing roles (`baseline`, `deb-hardening-basic`, `docker`, `ai-*`, `killswitch`, `patch`, `vyos-hardening-basic`) are left **byte-unchanged**.
+- Existing role **task logic** is left unchanged. The one exception (Task 8, lint cleanup) is mechanical: the 5 hyphenated role directories are renamed to underscores (`ai-identities`→`ai_identities`, `ai-workbench`→`ai_workbench`, `deb-hardening-basic`→`deb_hardening_basic`, `dev-tools`→`dev_tools`, `vyos-hardening-basic`→`vyos_hardening_basic`) with references updated — no behavioural edits to their tasks.
+- The vendored `roles/docker` (upstream geerlingguy, replaced wholesale by the Galaxy role in ANS-3) is **excluded from lint**, not hand-edited — you don't lint a vendored dependency.
 - `import_playbook` paths are relative to `site.yml` (repo root); roles resolve via `roles_path`.
 - Galaxy deps are **declared only**; verified installable to a throwaway temp dir — nothing installed is committed. Every collection ANS-1 references at runtime (`vyos.vyos`, `ansible.netcommon`, `community.sops`, `community.docker`) already ships with the host's `ansible` package and is always searched regardless of `collections_path`, so **no** local install and **no** `collections_path` override are needed. Do not set `collections_path`.
 - Git: short commit messages, no attribution trailer (user convention).
-- Acceptance for the whole plan: `ansible-playbook --syntax-check site.yml`, `ansible-lint`, and `ansible-playbook --check site.yml` all pass; the three `playbooks/ops/` router/patch playbooks resolve standalone; `v2e-tf.git/` is gone.
+- Acceptance for the whole plan: `ansible-playbook --syntax-check site.yml` and `ansible-playbook --check site.yml` pass; the three `playbooks/ops/` router/patch playbooks resolve standalone; `v2e-tf.git/` is gone; and after Task 8, repo-wide `ansible-lint` reports **0 failures** (with `roles/docker` excluded as vendored). The linter environment must have `vyos.vyos` + `ansible.netcommon` available (install into `~/.ansible/collections` if using an isolated ansible-lint) so `vyos.vyos.vyos_config` resolves.
 
 ---
 
@@ -485,10 +486,10 @@ Expected: passes (old inline `site.yml` still valid). This is the "before" basel
 Run: `ansible-playbook --syntax-check site.yml`
 Expected: prints the combined play list from all three phase playbooks; no "Could not find" errors.
 
-- [ ] **Step 4: Lint the whole tree**
+- [ ] **Step 4: Lint the restructured playbooks (interim — authoritative lint is Task 8)**
 
-Run: `ansible-lint`
-Expected: no failures (pre-existing warnings on unchanged roles are acceptable; no NEW errors from the restructure).
+Run: `ansible-lint site.yml playbooks/`
+Expected: the only remaining failures are `role-name` on the still-hyphenated role directories (`ai-identities`, `ai-workbench`, `deb-hardening-basic`, `dev-tools`, `vyos-hardening-basic`) — those are renamed in Task 8. No OTHER new failures from the restructure. (Repo-wide 0-failures is verified in Task 8.)
 
 - [ ] **Step 5: Full dry-run resolves every play/role**
 
@@ -510,6 +511,81 @@ Expected: `ls` → "No such file"; `site syntax` → `OK`; three `OK playbooks/o
 ```bash
 git add site.yml
 git commit -m "site: thin orchestrator importing 01/02/03 phase playbooks"
+```
+
+---
+
+### Task 8: Lint cleanup — exclude vendored role, rename hyphenated roles, reach 0 failures
+
+**Context:** repo-wide `ansible-lint` currently reports 73 failures. 67 are inside the **vendored** `roles/docker` (upstream geerlingguy, replaced wholesale by the Galaxy role in ANS-3) — excluded, not edited. 1 was a linter-environment artifact (`vyos.vyos` not visible to an isolated ansible-lint). The remaining 5 are `role-name` on hyphenated role directories. This task drives the repo to **0 failures** by excluding the vendored role and renaming the 5 hyphenated roles to underscores.
+
+**Files:**
+- Create: `.ansible-lint`
+- Rename (git mv, dirs): `roles/ai-identities`→`roles/ai_identities`, `roles/ai-workbench`→`roles/ai_workbench`, `roles/deb-hardening-basic`→`roles/deb_hardening_basic`, `roles/dev-tools`→`roles/dev_tools`, `roles/vyos-hardening-basic`→`roles/vyos_hardening_basic`
+- Modify references: `playbooks/01-bootstrap.yml`, `playbooks/03-applications.yml`, `playbooks/ops/vyos-hardening.yml`, `playbooks/ops/agents.yml`, and the 5 renamed roles' `README.md` H1 headings
+
+**Interfaces:**
+- Consumes: the full restructured tree from Tasks 5–7.
+- Produces: underscore role names everywhere; `roles/docker` excluded from lint.
+
+- [ ] **Step 1: Ensure the linter can resolve `vyos.vyos` (environment, one-time)**
+
+Run: `ansible-galaxy collection install vyos.vyos ansible.netcommon -p ~/.ansible/collections --force`
+Expected: both installed under `~/.ansible/collections/ansible_collections/`. (Fixes the `couldn't resolve module/action 'vyos.vyos.vyos_config'` syntax-check failure that an isolated pipx ansible-lint hits.)
+
+- [ ] **Step 2: Create `.ansible-lint`**
+
+```yaml
+---
+# roles/docker is vendored upstream (geerlingguy.docker 8.0.0), replaced wholesale
+# by the pinned Galaxy role in ANS-3. Vendored dependencies are not ours to lint.
+exclude_paths:
+  - roles/docker/
+```
+
+- [ ] **Step 3: Rename the 5 hyphenated role directories (preserve history)**
+
+```bash
+git mv roles/ai-identities        roles/ai_identities
+git mv roles/ai-workbench         roles/ai_workbench
+git mv roles/deb-hardening-basic  roles/deb_hardening_basic
+git mv roles/dev-tools            roles/dev_tools
+git mv roles/vyos-hardening-basic roles/vyos_hardening_basic
+```
+
+- [ ] **Step 4: Update role references in the playbooks**
+
+Edit these role references (the `- rolename` / `- role: rolename` lines only — leave task logic untouched):
+- `playbooks/01-bootstrap.yml`: `deb-hardening-basic` → `deb_hardening_basic`
+- `playbooks/03-applications.yml`: `ai-identities` → `ai_identities`, `ai-workbench` → `ai_workbench`
+- `playbooks/ops/vyos-hardening.yml`: `vyos-hardening-basic` → `vyos_hardening_basic`
+- `playbooks/ops/agents.yml`: `ai-identities` → `ai_identities`, `ai-workbench` → `ai_workbench`
+
+Then confirm no stale hyphenated references remain:
+```bash
+grep -rnE '\b(ai-identities|ai-workbench|deb-hardening-basic|dev-tools|vyos-hardening-basic)\b' site.yml playbooks/ roles/*/README.md
+```
+Expected: no matches (update any README H1 headings the grep surfaces, e.g. `# dev-tools` → `# dev_tools`).
+
+- [ ] **Step 5: Verify repo-wide lint is clean**
+
+Run: `ansible-lint`
+Expected: `Passed` / exit 0 — 0 failures (the `role-name` violations are gone; `roles/docker` is excluded).
+
+- [ ] **Step 6: Verify the restructured playbooks still resolve after the renames**
+
+Run:
+```bash
+ansible-playbook --syntax-check site.yml >/dev/null && echo "site OK"
+for p in playbooks/ops/*.yml; do ansible-playbook --syntax-check "$p" >/dev/null && echo "OK $p"; done
+```
+Expected: `site OK` and one `OK` line per ops playbook — no "role not found" from a missed reference.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add -A
+git commit -m "lint: exclude vendored roles/docker; rename hyphenated roles to underscores"
 ```
 
 ---
