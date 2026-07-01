@@ -1,4 +1,4 @@
-# deb-hardening-basic
+# deb_hardening_basic
 
 General, reusable **baseline** hardening for any Debian/Ubuntu host. Minimal and
 host-agnostic — no environment-specific assumptions. Layer host/role-specific

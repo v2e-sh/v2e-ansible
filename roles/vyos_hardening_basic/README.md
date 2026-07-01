@@ -1,4 +1,4 @@
-# vyos-hardening-basic
+# vyos_hardening_basic
 
 General, minimal hardening for a VyOS router (1.4 sagitta / 1.5 circinus), applied
 via the `vyos.vyos` collection over `network_cli`. No topology/firewall specifics —

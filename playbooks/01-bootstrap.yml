@@ -26,4 +26,4 @@
   hosts: linux
   become: true
   roles:
-    - deb-hardening-basic
+    - deb_hardening_basic

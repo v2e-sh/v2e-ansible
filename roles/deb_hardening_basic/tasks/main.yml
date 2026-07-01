@@ -17,7 +17,7 @@
   notify: Reload sshd
   when: deb_hardening_ssh
 
-- name: sysctl — network/kernel hardening drop-in
+- name: Sysctl — network/kernel hardening drop-in
   ansible.builtin.copy:
     dest: /etc/sysctl.d/90-hardening.conf
     owner: root
@@ -39,7 +39,7 @@
   notify: Reload sysctl
   when: deb_hardening_sysctl
 
-- name: fail2ban — install (python3-systemd needed for the journal backend on Debian)
+- name: Fail2ban — install (python3-systemd needed for the journal backend on Debian)
   ansible.builtin.apt:
     name:
       - fail2ban
@@ -49,7 +49,7 @@
     cache_valid_time: 3600
   when: deb_hardening_fail2ban
 
-- name: fail2ban — enable sshd jail
+- name: Fail2ban — enable sshd jail
   ansible.builtin.copy:
     dest: /etc/fail2ban/jail.d/sshd.local
     owner: root
@@ -64,7 +64,7 @@
   notify: Restart fail2ban
   when: deb_hardening_fail2ban
 
-- name: fail2ban — enabled and running
+- name: Fail2ban — enabled and running
   ansible.builtin.systemd_service:
     name: fail2ban
     enabled: true

@@ -1,0 +1,22 @@
+---
+# General, reusable baseline hardening for ANY Debian/Ubuntu host. Minimal and
+# host-agnostic — no environment-specific assumptions. Host/role-specific
+# hardening belongs in deb-hardening-{server,agent,host}. All toggleable.
+#
+# Variable prefix: deb_hardening_ (intentionally shorter than deb_hardening_basic_).
+# noqa comments below suppress the over-eager var-naming[no-role-prefix] rule.
+
+# --- SSH daemon (drop-in: /etc/ssh/sshd_config.d/10-hardening.conf) ---
+deb_hardening_ssh: true  # noqa: var-naming[no-role-prefix]
+deb_hardening_ssh_password_auth: false  # noqa: var-naming[no-role-prefix] key-only auth
+deb_hardening_ssh_permit_root_login: "no"  # noqa: var-naming[no-role-prefix] "no" | "prohibit-password"
+deb_hardening_ssh_max_auth_tries: 4  # noqa: var-naming[no-role-prefix]
+deb_hardening_ssh_x11_forwarding: false  # noqa: var-naming[no-role-prefix]
+deb_hardening_ssh_client_alive_interval: 300  # noqa: var-naming[no-role-prefix]
+deb_hardening_ssh_client_alive_count_max: 2  # noqa: var-naming[no-role-prefix]
+
+# --- sysctl network/kernel hardening (/etc/sysctl.d/90-hardening.conf) ---
+deb_hardening_sysctl: true  # noqa: var-naming[no-role-prefix]
+
+# --- fail2ban (sshd jail) ---
+deb_hardening_fail2ban: true  # noqa: var-naming[no-role-prefix]

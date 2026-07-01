@@ -1,4 +1,4 @@
-# ai-identities
+# ai_identities
 
 Per-AI-agent Unix identities and their SSH mesh, provisioned by Ansible. Run
 against the `linux` group (see `agents.yml`).

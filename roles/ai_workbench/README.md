@@ -1,7 +1,7 @@
-# ai-workbench
+# ai_workbench
 
 Turns the **agent** node into an AI workbench. Run against the `agent` host (see
-`agents.yml`); the accounts themselves come from the `ai-identities` role.
+`agents.yml`); the accounts themselves come from the `ai_identities` role.
 
 Installs:
 

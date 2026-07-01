@@ -1,0 +1,5 @@
+---
+# roles/docker is vendored upstream (geerlingguy.docker 8.0.0), replaced wholesale
+# by the pinned Galaxy role in ANS-3. Vendored dependencies are not ours to lint.
+exclude_paths:
+  - roles/docker/

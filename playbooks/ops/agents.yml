@@ -16,15 +16,15 @@
   become: true
   tags:
     - ai
-    - ai-identities
+    - ai_identities
   roles:
-    - ai-identities
+    - ai_identities
 
 - name: AI workbench on the agent node
   hosts: agent
   become: true
   tags:
     - ai
-    - ai-workbench
+    - ai_workbench
   roles:
-    - ai-workbench
+    - ai_workbench

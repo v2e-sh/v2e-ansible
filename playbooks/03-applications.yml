@@ -5,10 +5,10 @@
   hosts: linux
   become: true
   roles:
-    - ai-identities
+    - ai_identities
 
 - name: AI workbench on the agent node
   hosts: agent
   become: true
   roles:
-    - ai-workbench
+    - ai_workbench
