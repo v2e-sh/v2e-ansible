@@ -1,0 +1,7 @@
+---
+# devsec os_hardening: its default sysctl set forces net.ipv4.ip_forward=0, which
+# breaks Docker/container routing. Override back to 1 on every Linux node. All
+# other os_hardening sysctls (rp_filter, syncookies, redirects, kptr/dmesg
+# restrict, ...) are kept at devsec defaults — they match the retired drop-in.
+sysctl_overwrite:
+  net.ipv4.ip_forward: 1
