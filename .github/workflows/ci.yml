@@ -11,15 +11,15 @@ jobs:
       - run: python -m pip install ansible
       - run: ansible-playbook --syntax-check -i inventory/hosts.ini site.yml
 
-  # Advisory: surfaces lint/style debt without blocking merges.
+  # Advisory: surfaces lint/style debt as warnings without blocking merges.
+  # Drop the "|| echo" guards to make these blocking once the backlog is clear.
   lint:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - run: python -m pip install ansible ansible-lint yamllint
-      - run: yamllint .
-      - run: ansible-lint
+      - run: yamllint . || echo "::warning::yamllint reported findings (advisory)"
+      - run: ansible-lint || echo "::warning::ansible-lint reported findings (advisory)"
 
   # Blocking: repo is currently secret-free; keep it that way.
   secret-scan:
