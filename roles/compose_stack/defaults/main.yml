@@ -1,0 +1,14 @@
+---
+# Overridden by inventory/group_vars/services.yml. Secrets are NOT here — they
+# come from SOPS group_vars/all.yml (cf_dns_api_token, tinyauth_auth_users).
+compose_stack_repo_url: ""
+compose_stack_repo_version: main
+compose_stack_dir: /opt/v2e-compose
+compose_stack_stacks:
+  - traefik
+  - tinyauth
+  - whoami
+compose_stack_network: frontend
+compose_stack_domain: ""
+compose_stack_acme_email: ""
+compose_stack_cert_resolver: staging
