@@ -1,3 +1,6 @@
+---
+# Galaxy-installed roles/collections are third-party dependencies (installed to
+# these gitignored dirs), not ours to lint. Only the repo's own roles/ are linted.
 exclude_paths:
   - .galaxy/
   - .ansible/
