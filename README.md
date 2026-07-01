@@ -41,7 +41,7 @@ ping (smoke test)  ->  baseline (all)  ->  patch (on demand)  ->  docker (servic
    sees a patched system.
 2. **Ongoing security (autonomous)** — unattended-upgrades, security-only, no
    auto-reboot (baseline role).
-3. **On-demand full patch** — `ansible-playbook site.yml --tags patch` (patch role).
+3. **On-demand full patch** — `ansible-playbook playbooks/ops/patch.yml` (patch role).
 
 ## Run it manually (on control)
 
@@ -49,7 +49,7 @@ ping (smoke test)  ->  baseline (all)  ->  patch (on demand)  ->  docker (servic
 cd ~/ansible
 ansible all -m ping                       # connectivity
 ansible-playbook site.yml                 # baseline + docker (patch is skipped)
-ansible-playbook site.yml --tags patch    # on-demand full patch + reboot-if-needed
+ansible-playbook playbooks/ops/patch.yml  # on-demand full patch + reboot-if-needed
 ```
 
 ## Layout
@@ -76,11 +76,11 @@ Separate from the unattended `site.yml` first-boot run, these are **deliberate
 operator actions**, run from control as the `ansible` user.
 
 ```bash
-ansible-playbook agents.yml                              # create AI identities + build the workbench
-ansible-playbook task-agent.yml -e agent=claude -e 'task=Summarise the repo'
-ansible-playbook killswitch.yml --tags cut              # surgical cut of the agent subnet
-ansible-playbook killswitch.yml --tags allow            # restore
-ansible-playbook killswitch.yml --tags cut-hard         # disable the agent VLAN interface
+ansible-playbook playbooks/ops/agents.yml                              # create AI identities + build the workbench
+ansible-playbook playbooks/ops/task-agent.yml -e agent=claude -e 'task=Summarise the repo'
+ansible-playbook playbooks/ops/killswitch.yml --tags cut              # surgical cut of the agent subnet
+ansible-playbook playbooks/ops/killswitch.yml --tags allow            # restore
+ansible-playbook playbooks/ops/killswitch.yml --tags cut-hard         # disable the agent VLAN interface
 ```
 
 - **`agents.yml`** — `ai-identities` creates `claude` + `codex` accounts (root via

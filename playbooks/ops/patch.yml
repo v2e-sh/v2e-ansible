@@ -1,0 +1,13 @@
+---
+# Standalone operational — orchestrated full patch. Run explicitly from control:
+#   ansible-playbook playbooks/ops/patch.yml            # patch all Linux nodes
+#   ansible-playbook playbooks/ops/patch.yml --tags patch --limit services
+# Reboots only nodes that need it, never the controller (see roles/patch).
+
+- name: Orchestrated full patch
+  hosts: linux
+  become: true
+  tags:
+    - patch
+  roles:
+    - patch
