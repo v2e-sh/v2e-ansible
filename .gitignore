@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Ansible runtime artifacts
+*.retry
+fact_cache/
+
+# Vault password files and secrets — never commit
+.vault_pass
+vault-password*
+*.vault
+
+# Local inventory overrides that may hold real hosts/creds
+inventory/*.local.ini
