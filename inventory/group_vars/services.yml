@@ -1,3 +1,14 @@
 ---
 # Preserve AllowUsers exactly: cluster user + ansible automation account.
 ssh_allow_users: "v2e ansible"
+# --- v2e-compose deploy (ANS-3). Non-secret config only. Secrets
+# (cf_dns_api_token, tinyauth_auth_users) come from SOPS group_vars/all.yml. ---
+compose_stack_repo_url: "https://github.com/v2e-sh/v2e-compose.git"
+compose_stack_dir: /opt/v2e-compose
+compose_stack_stacks:
+  - traefik
+  - tinyauth
+  - whoami
+compose_stack_domain: "v2e.sh"
+compose_stack_acme_email: "admin@v2e.sh"
+compose_stack_cert_resolver: staging
