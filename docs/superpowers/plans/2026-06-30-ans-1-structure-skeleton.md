@@ -160,8 +160,9 @@ become_method = sudo
 
 [ssh_connection]
 # devsec.hardening (ANS-2) sets sftp_enabled: true; use SFTP for file transfer so
-# Ansible copies keep working after hardening.
-ssh_transfer_method = sftp
+# Ansible copies keep working after hardening. (ini key is `transfer_method`; the
+# ssh plugin option name is ssh_transfer_method.)
+transfer_method = sftp
 ```
 
 - [ ] **Step 3: Verify the config loads and the vars plugin resolves**

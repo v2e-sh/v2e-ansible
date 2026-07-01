@@ -106,8 +106,9 @@ v2e-ansible/
 
 ### 6. `ansible.cfg` additions
 - Enable the SOPS vars plugin: `vars_plugins_enabled = host_group_vars,community.sops.sops`.
-- SFTP-compatible transfer: `ssh_transfer_method = sftp` under `[ssh_connection]`
-  (pairs with `devsec.hardening`'s `sftp_enabled: true` in ANS-2).
+- SFTP-compatible transfer: `transfer_method = sftp` under `[ssh_connection]`
+  (the ssh plugin option `ssh_transfer_method`; ini key is `transfer_method`. Pairs
+  with `devsec.hardening`'s `sftp_enabled: true` in ANS-2).
 - Keep existing `roles_path = roles`, `host_key_checking = False`, `become` settings.
 - **No `collections_path` override** (correction, verified 2026-06-30): `community.sops`,
   `vyos.vyos`, `ansible.netcommon`, and `community.docker` all ship with the host `ansible`
