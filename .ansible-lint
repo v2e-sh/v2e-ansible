@@ -1,6 +1,3 @@
----
-# Galaxy-installed roles are upstream dependencies — not ours to lint.
-# artis3n.tailscale excluded for the same reason when it lands.
 exclude_paths:
-  - roles/geerlingguy.docker/
-  - roles/artis3n.tailscale/
+  - .galaxy/
+  - .ansible/
