@@ -14,7 +14,7 @@
 - **Pure skeleton** — no role-body swaps, no devsec/geerlingguy wiring, no SOPS secret content. Structure only.
 - Existing roles (`baseline`, `deb-hardening-basic`, `docker`, `ai-*`, `killswitch`, `patch`, `vyos-hardening-basic`) are left **byte-unchanged**.
 - `import_playbook` paths are relative to `site.yml` (repo root); roles resolve via `roles_path`.
-- Galaxy deps are **declared and installed only to a gitignored `.galaxy/` path** — nothing installed is committed.
+- Galaxy deps are **declared only**; verified installable to a throwaway temp dir — nothing installed is committed. Every collection ANS-1 references at runtime (`vyos.vyos`, `ansible.netcommon`, `community.sops`, `community.docker`) already ships with the host's `ansible` package and is always searched regardless of `collections_path`, so **no** local install and **no** `collections_path` override are needed. Do not set `collections_path`.
 - Git: short commit messages, no attribution trailer (user convention).
 - Acceptance for the whole plan: `ansible-playbook --syntax-check site.yml`, `ansible-lint`, and `ansible-playbook --check site.yml` all pass; the three `playbooks/ops/` router/patch playbooks resolve standalone; `v2e-tf.git/` is gone.
 
@@ -41,13 +41,12 @@ rm -rf v2e-tf.git
 - [ ] **Step 3: Create `.gitignore`**
 
 ```gitignore
-# Galaxy deps installed locally for verification (declared in requirements.yml,
-# installed by CI / control cloud-init in later phases — never committed here).
-.galaxy/
-
-# Ansible runtime noise
+# Ansible runtime + local galaxy-install noise. Deps are declared in
+# requirements.yml and installed by CI / control cloud-init in later phases —
+# never committed here.
 *.retry
 __pycache__/
+.galaxy/
 ```
 
 - [ ] **Step 4: Verify the stray repo is gone and nothing bare remains**
@@ -70,9 +69,9 @@ git commit -m "chore: drop stray v2e-tf.git mirror; add .gitignore"
 - Modify: `requirements.yml` (currently `roles: []`)
 
 **Interfaces:**
-- Produces: a `requirements.yml` installable by `ansible-galaxy install -r requirements.yml`; `community.sops` must be resolvable so the vars plugin enabled in Task 3 loads.
+- Produces: a `requirements.yml` installable by `ansible-galaxy install -r requirements.yml`. Not consumed at runtime in ANS-1 — the collections it names already ship with the host `ansible` package; this file is the manifest CI / control cloud-init install from in later phases.
 
-- [ ] **Step 1: Write `requirements.yml`**
+- [ ] **Step 1: Write `requirements.yml`** (version pins verified against Galaxy 2026-06-30)
 
 ```yaml
 ---
@@ -83,9 +82,9 @@ git commit -m "chore: drop stray v2e-tf.git mirror; add .gitignore"
 # roles/docker is a vendored 8.0.0 copy. Reconcile at ANS-3 (the docker swap).
 roles:
   - name: geerlingguy.docker
-    version: "7.4.1"
+    version: "7.9.0"
   - name: artis3n.tailscale
-    version: "5.4.4"
+    version: "v5.0.1"
 
 collections:
   - name: community.docker
@@ -96,26 +95,26 @@ collections:
     version: ">=1.6.0"
 ```
 
-- [ ] **Step 2: Install into the gitignored path to verify resolvability**
+- [ ] **Step 2: Verify the whole file resolves (install to a throwaway temp dir, nothing committed)**
 
 Run:
 ```bash
-ansible-galaxy install -r requirements.yml \
-  --roles-path .galaxy/roles \
-  && ansible-galaxy collection install -r requirements.yml -p .galaxy/collections
+TMP=$(mktemp -d)
+ansible-galaxy install -r requirements.yml --roles-path "$TMP/roles" \
+  && ansible-galaxy collection install -r requirements.yml -p "$TMP/collections"
+echo "resolved rc=$?"; rm -rf "$TMP"
 ```
-Expected: both complete without error; `.galaxy/roles/geerlingguy.docker` and `.galaxy/collections/ansible_collections/community/sops` exist.
+Expected: both complete without error and `resolved rc=0` (proves every pin exists). The temp dir is discarded — nothing lands in the repo.
 
-If a **role** version is rejected as non-existent, find the current 7.x / latest tag and correct the pin, then re-run:
+If a **role** version is rejected as non-existent, list the real tags and correct the pin, then re-run:
 ```bash
-ansible-galaxy role info geerlingguy.docker | grep -iE '^\s*version'
-ansible-galaxy role info artis3n.tailscale | grep -iE '^\s*version'
+curl -s "https://galaxy.ansible.com/api/v1/roles/?owner__username=geerlingguy&name=docker" | python3 -c "import sys,json;print([v['name'] for v in json.load(sys.stdin)['results'][0]['summary_fields']['versions'][:10]])"
 ```
 
-- [ ] **Step 3: Confirm `.galaxy/` is ignored (not staged)**
+- [ ] **Step 3: Confirm only `requirements.yml` changed**
 
-Run: `git status --porcelain .galaxy`
-Expected: empty output (ignored by Task 1's `.gitignore`).
+Run: `git status --porcelain`
+Expected: shows only `requirements.yml` modified (no `.galaxy/`, no temp artifacts).
 
 - [ ] **Step 4: Commit**
 
@@ -126,14 +125,14 @@ git commit -m "deps: declare galaxy roles/collections for later phases"
 
 ---
 
-### Task 3: Extend `ansible.cfg` for later phases (collections, SOPS, SFTP)
+### Task 3: Extend `ansible.cfg` for later phases (SOPS vars plugin, SFTP)
 
 **Files:**
 - Modify: `ansible.cfg`
 
 **Interfaces:**
-- Consumes: `community.sops` installed to `.galaxy/collections` (Task 2).
-- Produces: `collections_path` including `.galaxy/collections`; the SOPS vars plugin enabled; SFTP transfer set.
+- Consumes: `community.sops` from the bundled `ansible` package collections (always searched; no install needed).
+- Produces: the SOPS vars plugin enabled and SFTP transfer set. `collections_path` is deliberately NOT set (bundled collections resolve without it; overriding it adds nothing).
 
 - [ ] **Step 1: Verify the SOPS vars plugin is currently NOT enabled**
 
@@ -145,14 +144,14 @@ Expected: `not set`.
 ```ini
 [defaults]
 inventory = inventory/hosts.ini
-roles_path = roles:.galaxy/roles
-collections_path = .galaxy/collections
+roles_path = roles
 host_key_checking = False
 retry_files_enabled = False
 stdout_callback = default
 result_format = yaml
 # SOPS-encrypted group/host vars are auto-decrypted by the community.sops vars
 # plugin (used from ANS-2). host_group_vars stays enabled for plain vars.
+# community.sops ships with the ansible package, so no collections_path is needed.
 vars_plugins_enabled = host_group_vars,community.sops.sops
 
 [privilege_escalation]
@@ -167,8 +166,8 @@ ssh_transfer_method = sftp
 
 - [ ] **Step 3: Verify the config loads and the vars plugin resolves**
 
-Run: `ansible-config dump --only-changed 2>&1 | grep -iE 'vars_plugins_enabled|transfer_method|collections_path'`
-Expected: shows `community.sops.sops`, `sftp`, and the `.galaxy/collections` path — with **no** "vars plugin not found" error above them.
+Run: `ansible-config dump --only-changed 2>&1 | grep -iE 'vars_plugins_enabled|transfer_method'`
+Expected: shows `community.sops.sops` and `sftp` — with **no** "vars plugin not found" error above them.
 
 - [ ] **Step 4: Smoke-check that a trivial local play still runs (plugin loads cleanly)**
 

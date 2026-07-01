@@ -105,11 +105,15 @@ v2e-ansible/
   docker swap) rather than silently diverging.
 
 ### 6. `ansible.cfg` additions
-- `collections_path` (alongside existing `roles_path`).
 - Enable the SOPS vars plugin: `vars_plugins_enabled = host_group_vars,community.sops.sops`.
 - SFTP-compatible transfer: `ssh_transfer_method = sftp` under `[ssh_connection]`
   (pairs with `devsec.hardening`'s `sftp_enabled: true` in ANS-2).
-- Keep existing `host_key_checking = False`, `become` settings.
+- Keep existing `roles_path = roles`, `host_key_checking = False`, `become` settings.
+- **No `collections_path` override** (correction, verified 2026-06-30): `community.sops`,
+  `vyos.vyos`, `ansible.netcommon`, and `community.docker` all ship with the host `ansible`
+  package and are searched regardless of `collections_path`. Overriding it (as an earlier
+  draft did) adds a moving part with no ANS-1 benefit; the Galaxy deps are declared in
+  `requirements.yml` for CI / cloud-init to install in later phases.
 
 ### 7. Scaffold two roles
 - `roles/health_check/` and `roles/dev-tools/`, each with `tasks/main.yml` (a single
