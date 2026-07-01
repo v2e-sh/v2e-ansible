@@ -6,6 +6,9 @@
 # Operational playbooks are NOT imported here — run them explicitly from
 # playbooks/ops/ (killswitch, patch, vyos-hardening, agents, task-agent).
 
-- import_playbook: playbooks/01-bootstrap.yml
-- import_playbook: playbooks/02-services.yml
-- import_playbook: playbooks/03-applications.yml
+- name: Bootstrap phase (reachability, baseline OS, hardening)
+  import_playbook: playbooks/01-bootstrap.yml
+- name: Services phase (container runtime)
+  import_playbook: playbooks/02-services.yml
+- name: Applications phase (AI identities + workbench)
+  import_playbook: playbooks/03-applications.yml
