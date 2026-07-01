@@ -3,5 +3,14 @@
 # breaks Docker/container routing. Override back to 1 on every Linux node. All
 # other os_hardening sysctls (rp_filter, syncookies, redirects, kptr/dmesg
 # restrict, ...) are kept at devsec defaults — they match the retired drop-in.
+#
+# NOTE: os_hardening only applies sysctls on non-container virtualization
+# (it skips docker/lxc/openvz). The v2e nodes are Proxmox KVM VMs, so this
+# override lands. If a Docker host were ever reprovisioned as an LXC, the whole
+# sysctl block (and this override) would be skipped — keep the Docker node a VM.
 sysctl_overwrite:
   net.ipv4.ip_forward: 1
+
+# Match the retired role's SSH keepalive intent (interval 300 / count 2). devsec's
+# ssh_client_alive_interval already defaults to 300; count defaults to 3, so pin 2.
+ssh_client_alive_count: 2
