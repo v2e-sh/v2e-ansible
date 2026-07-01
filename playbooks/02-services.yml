@@ -1,0 +1,12 @@
+---
+# Phase 02 — services: container runtime on the services node.
+# Vendored docker role unchanged (geerlingguy swap is ANS-3).
+
+- name: Install Docker on the services host
+  hosts: services
+  become: true
+  roles:
+    - role: docker
+      vars:
+        # Keep the Compose v2 plugin (`docker compose ...`) installed.
+        docker_install_compose_plugin: true

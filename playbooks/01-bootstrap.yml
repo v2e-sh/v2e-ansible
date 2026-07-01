@@ -1,0 +1,29 @@
+---
+# Phase 01 — bootstrap: reachability + baseline OS + basic hardening on every
+# Linux node. Imported first by site.yml; health_check runs first as the
+# fail-fast gate (real assertions arrive in ANS-2).
+
+- name: Smoke test — confirm the automation mesh can reach every node
+  hosts: linux
+  gather_facts: false
+  tasks:
+    - name: Ping all managed hosts
+      ansible.builtin.ping:
+
+- name: Health checks (fail-fast gate)
+  hosts: linux
+  become: true
+  roles:
+    - health_check
+
+- name: Baseline configuration on all Linux nodes
+  hosts: linux
+  become: true
+  roles:
+    - baseline
+
+- name: Basic system hardening on all Linux nodes
+  hosts: linux
+  become: true
+  roles:
+    - deb-hardening-basic
