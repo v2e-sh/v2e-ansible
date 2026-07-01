@@ -1,70 +1,11 @@
 ---
-# Run FROM the control node (controller = control) as the `ansible` automation
-# user. See README.md.
+# Unattended first-boot entry point. Run FROM control as the `ansible` user
+# (see README). Statically imports the phase playbooks in order; health_check in
+# 01-bootstrap is the fail-fast gate.
 #
-#   ping -> baseline -> hardening -> ai-identities (linux) -> ai-workbench (agent)
-#   -> patch (on demand) -> docker (services) -> vyos-hardening (on demand: --tags vyos)
-#
-# ansible.builtin plays target the `linux` group (control/services/agent); the
-# VyOS router is a separate network_cli play (--tags vyos), never in linux scope.
+# Operational playbooks are NOT imported here — run them explicitly from
+# playbooks/ops/ (killswitch, patch, vyos-hardening, agents, task-agent).
 
-- name: Smoke test — confirm the automation mesh can reach every node
-  hosts: linux
-  gather_facts: false
-  tasks:
-    - name: Ping all managed hosts
-      ansible.builtin.ping:
-
-- name: Baseline configuration on all Linux nodes
-  hosts: linux
-  become: true
-  roles:
-    - baseline
-
-- name: Basic system hardening on all Linux nodes
-  hosts: linux
-  become: true
-  roles:
-    - deb-hardening-basic
-
-- name: AI-agent identities across all Linux nodes
-  hosts: linux
-  become: true
-  roles:
-    - ai-identities
-
-- name: AI workbench on the agent node
-  hosts: agent
-  become: true
-  roles:
-    - ai-workbench
-
-- name: Orchestrated full patch (on demand — run with --tags patch)
-  hosts: linux
-  become: true
-  tags:
-    - patch
-    - never
-  roles:
-    - patch
-
-- name: Install Docker on the services host
-  hosts: services
-  become: true
-  roles:
-    - role: docker
-      vars:
-        # Keep the Compose v2 plugin (`docker compose ...`) installed.
-        docker_install_compose_plugin: true
-        # Users to add to the `docker` group (uncomment as needed):
-        # docker_users:
-        #   - ansible
-
-- name: VyOS router hardening (on demand — run with --tags vyos)
-  hosts: vyos
-  gather_facts: false
-  tags:
-    - vyos
-    - never
-  roles:
-    - vyos-hardening-basic
+- import_playbook: playbooks/01-bootstrap.yml
+- import_playbook: playbooks/02-services.yml
+- import_playbook: playbooks/03-applications.yml
