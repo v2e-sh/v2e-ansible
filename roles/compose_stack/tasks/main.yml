@@ -48,3 +48,31 @@
   loop: "{{ compose_stack_stacks }}"
   loop_control:
     label: "{{ item }}"
+
+# Make the stack visible/editable to a human operator: the compose files land in
+# /opt owned by root, which the cluster user can't even read. Add them to the docker
+# group, group-own the tree by docker (g+rwX), and symlink it into their home.
+- name: Make the deployed stack manageable by the operator
+  when: compose_stack_manage_user | default('') | length > 0
+  block:
+    - name: Add the operator to the docker group
+      ansible.builtin.user:
+        name: "{{ compose_stack_manage_user }}"
+        groups: docker
+        append: true
+
+    - name: Group-own the stack dir (docker) with group rwX so the operator can read/edit
+      ansible.builtin.file:
+        path: "{{ compose_stack_dir }}"
+        group: docker
+        mode: g+rwX
+        recurse: true
+
+    - name: Symlink the stack into the operator's home (~/v2e-compose)
+      ansible.builtin.file:
+        src: "{{ compose_stack_dir }}"
+        dest: "/home/{{ compose_stack_manage_user }}/v2e-compose"
+        state: link
+        owner: "{{ compose_stack_manage_user }}"
+        group: "{{ compose_stack_manage_user }}"
+        force: true
