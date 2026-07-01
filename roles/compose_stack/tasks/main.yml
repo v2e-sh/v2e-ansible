@@ -5,12 +5,12 @@
 - name: Assert required SOPS secrets are present
   ansible.builtin.assert:
     that:
-      - cf_dns_api_token | default('') | length > 0
-      - tinyauth_auth_users | default('') | length > 0
+      - cf_dns_api_token | default('') | trim | length > 0
+      - tinyauth_auth_users | default('') | trim | length > 0
     fail_msg: >-
       compose_stack needs cf_dns_api_token and tinyauth_auth_users from the SOPS
-      group_vars/all.yml (delivered by TF-2). One or both are missing/empty —
-      set them in your sops_secrets_file and re-run.
+      group_vars/all.sops.yaml (delivered by TF-2). One or both are missing/empty
+      — set them (lowercase keys) in your sops_secrets_file and re-run.
 
 - name: Ensure git is installed (needed to clone v2e-compose)
   ansible.builtin.apt:
@@ -37,6 +37,7 @@
     owner: root
     group: root
     mode: "0600"
+  no_log: true
 
 - name: Deploy each compose stack
   community.docker.docker_compose_v2:
