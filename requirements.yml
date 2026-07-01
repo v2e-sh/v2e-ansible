@@ -11,9 +11,10 @@ roles:
     version: "v5.0.1"
 
 collections:
+  # All versions are pinned exact; Renovate bumps them.
   - name: community.docker
-    version: ">=3.6.0"
+    version: "5.2.0"
   - name: devsec.hardening
-    version: ">=10.0.0,<11.0.0"
+    version: "10.6.0"
   - name: community.sops
-    version: ">=1.6.0"
+    version: "2.3.0"
