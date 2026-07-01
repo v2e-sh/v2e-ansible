@@ -9,6 +9,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: python -m pip install ansible
+      # Install the Galaxy deps the playbooks depend on (roles → .galaxy/roles to
+      # match roles_path; collections → default path) before resolving site.yml.
+      - run: ansible-galaxy role install -r requirements.yml -p .galaxy/roles
+      - run: ansible-galaxy collection install -r requirements.yml
       - run: ansible-playbook --syntax-check -i inventory/hosts.ini site.yml
 
   # Advisory: surfaces lint/style debt as warnings without blocking merges.
