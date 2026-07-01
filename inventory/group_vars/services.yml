@@ -11,4 +11,7 @@ compose_stack_stacks:
   - whoami
 compose_stack_domain: "v2e.sh"
 compose_stack_acme_email: "admin@v2e.sh"
-compose_stack_cert_resolver: staging
+# Staging validated the DNS-01 flow on first run (runbook Step 6); production is the
+# steady state (Step 7). Separate ACME storage (acme.json vs acme-staging.json), so
+# flipping re-issues cleanly.
+compose_stack_cert_resolver: production
