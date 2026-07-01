@@ -25,6 +25,6 @@ ai_identities_password: ""
 # Hosts each account can reach from the hub, rendered into ~/.ssh/config. The
 # router is intentionally absent.
 ai_identities_ssh_targets:
-  - { alias: control, host: 10.1.1.10 }
-  - { alias: services, host: 10.1.2.10 }
-  - { alias: agent, host: 10.1.3.10 }
+  - {alias: control, host: 10.1.1.10}
+  - {alias: services, host: 10.1.2.10}
+  - {alias: agent, host: 10.1.3.10}
