@@ -2,8 +2,8 @@
 # Task an AI agent on the agent node directly from control. Run from control as the
 # `ansible` user:
 #
-#   ansible-playbook task-agent.yml -e agent=claude -e 'task=Summarise the repo'
-#   ansible-playbook task-agent.yml -e agent=codex  -e 'task=Write a unit test for X'
+#   ansible-playbook playbooks/ops/task-agent.yml -e agent=claude -e 'task=Summarise the repo'
+#   ansible-playbook playbooks/ops/task-agent.yml -e agent=codex  -e 'task=Write a unit test for X'
 #
 # Runs one-shot/headless via the agent-run wrapper as the chosen AI account and
 # prints the result. For long-running work, wrap the task in tmux/systemd-run on the

@@ -2,12 +2,12 @@
 # Router-enforced kill switch for the agent subnet. Run from control as the
 # `ansible` user (or out-of-band from the Mac). Pick exactly one action by tag:
 #
-#   ansible-playbook killswitch.yml --tags cut        # surgical: drop agent egress + inter-VLAN, keep control<->agent
-#   ansible-playbook killswitch.yml --tags allow      # restore
-#   ansible-playbook killswitch.yml --tags cut-hard   # disable the agent VLAN interface entirely
+#   ansible-playbook playbooks/ops/killswitch.yml --tags cut        # surgical: drop agent egress + inter-VLAN, keep control<->agent
+#   ansible-playbook playbooks/ops/killswitch.yml --tags allow      # restore
+#   ansible-playbook playbooks/ops/killswitch.yml --tags cut-hard   # disable the agent VLAN interface entirely
 #
 # Each play forces killswitch_state itself, so there is no variable to fat-finger.
-# Every play also carries `never`: a tagless `ansible-playbook killswitch.yml` does
+# Every play also carries `never`: a tagless `ansible-playbook playbooks/ops/killswitch.yml` does
 # NOTHING — an explicit action tag is required (unlike site.yml, where plays run by
 # default). That guard is deliberate for a destructive emergency control.
 

@@ -2,7 +2,7 @@
 # Provision the AI-agent identities + workbench. Operator-initiated (NOT part of
 # site.yml's unattended first-boot run). Run from control as the `ansible` user:
 #
-#   ansible-playbook agents.yml
+#   ansible-playbook playbooks/ops/agents.yml
 #
 # SECURITY NOTE — the AI accounts get root (NOPASSWD sudo) on ALL Linux nodes,
 # INCLUDING control. control holds the ansible/v2e SSH keys that reach the VyOS
