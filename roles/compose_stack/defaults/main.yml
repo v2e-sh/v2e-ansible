@@ -12,3 +12,7 @@ compose_stack_network: frontend
 compose_stack_domain: ""
 compose_stack_acme_email: ""
 compose_stack_cert_resolver: staging
+# Human operator who should be able to see/edit the deployed stack (added to the
+# docker group; the stack dir is group-owned by docker and symlinked into their
+# home as ~/v2e-compose). Empty string disables the convenience (root-only stack).
+compose_stack_manage_user: v2e
