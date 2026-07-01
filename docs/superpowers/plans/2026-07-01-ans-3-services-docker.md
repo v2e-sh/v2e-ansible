@@ -350,11 +350,11 @@ git checkout -b feat/cloud-init-galaxy-install
 
 - [ ] **Step 2: Add the Galaxy install before the playbook run**
 
-In the control ansible-bootstrap runcmd (the `su - ${ansible_user} -c '... git clone ... && cd ~/ansible && ... ansible-playbook ...'` line), insert a requirements install **after `cd ~/ansible`** and **before** the `ansible-playbook` invocation, gated on the repo having a `requirements.yml`:
+In the control ansible-bootstrap runcmd (the `su - ${ansible_user} -c '... git clone ... && cd ~/ansible && ... ansible-playbook ...'` line), insert a requirements install **after `cd ~/ansible`** and **before** the `ansible-playbook` invocation. Use the **negated-guard** form so it tolerates a missing `requirements.yml` but ABORTS on a genuine install failure (rather than running a playbook doomed to fail on the missing role):
 ```bash
-{ [ -f requirements.yml ] && { ansible-galaxy role install -r requirements.yml -p .galaxy/roles; ansible-galaxy collection install -r requirements.yml; } || true; } && \
+{ [ ! -f requirements.yml ] || { ansible-galaxy role install -r requirements.yml -p .galaxy/roles && ansible-galaxy collection install -r requirements.yml; }; } && \
 ```
-Keep it on the same `&&` chain so a failure aborts before the playbook. `-p .galaxy/roles` matches the repo's `roles_path = .galaxy/roles:roles`; collections go to the default `~/.ansible/collections`.
+Semantics: no `requirements.yml` → `[ ! -f ]` short-circuits, chain continues; file present → both installs run under `&&`, and if either fails the block returns non-zero so the outer `&&` chain aborts before `ansible-playbook`. `-p .galaxy/roles` matches the repo's `roles_path = .galaxy/roles:roles`; collections go to the default `~/.ansible/collections`. (Do NOT use `{ [ -f ] && {...} || true; }` — the `|| true` swallows real install failures.)
 
 - [ ] **Step 3: Validate**
 
