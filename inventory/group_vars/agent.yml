@@ -1,0 +1,3 @@
+---
+# Preserve AllowUsers exactly: cluster user + ansible automation account.
+ssh_allow_users: "v2e ansible"

@@ -1,0 +1,22 @@
+---
+# Router-enforced kill switch for the agent subnet. Applied to the VyOS router via
+# the vyos.vyos collection (network_cli), like roles/vyos-hardening-basic. The cut
+# is additive + removable, so it composes with any base firewall already in place.
+
+# cut | allow | cut-hard. Driven by killswitch.yml's tags; override with -e.
+killswitch_state: cut
+
+# What the switch governs.
+killswitch_agent_subnet: "10.1.3.0/24"
+killswitch_mgmt_host: "10.1.1.10"
+
+# Forward-filter rule numbers reserved by the switch (override if they collide with
+# the base firewall): base, base+1 = mgmt carve-out; base+10 = the drop.
+killswitch_rule_base: 100
+
+# For cut-hard only: the VyOS LAN interface + the agent VLAN sub-interface id.
+killswitch_lan_iface: eth1
+killswitch_agent_vlan: 103
+
+# Persist to config.boot (survives reboot).
+killswitch_save: true

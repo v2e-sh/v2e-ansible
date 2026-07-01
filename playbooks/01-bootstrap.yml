@@ -1,0 +1,31 @@
+---
+# Phase 01 — bootstrap: reachability gate → baseline OS → OS/SSH hardening.
+# devsec.hardening is the SOLE owner of sshd_config hardening (the cloud-init
+# 60-v2e.conf drop-in is retired in v2e-tf). health_check runs first (fail-fast).
+
+- name: Smoke test — confirm the automation mesh can reach every node
+  hosts: linux
+  gather_facts: false
+  tasks:
+    - name: Ping all managed hosts
+      ansible.builtin.ping:
+
+- name: Health checks (fail-fast gate)
+  hosts: linux
+  gather_facts: false
+  roles:
+    - health_check
+
+- name: Baseline configuration on all Linux nodes
+  hosts: linux
+  become: true
+  roles:
+    - baseline
+
+- name: OS + SSH hardening (devsec) and fail2ban
+  hosts: linux
+  become: true
+  roles:
+    - devsec.hardening.os_hardening
+    - devsec.hardening.ssh_hardening
+    - fail2ban

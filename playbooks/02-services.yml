@@ -1,0 +1,20 @@
+---
+# Phase 02 — services: Docker engine + the v2e-compose stack on the services node.
+# geerlingguy.docker replaces the vendored role (ANS-3); compose_stack deploys the
+# traefik/tinyauth/whoami stacks.
+
+- name: Docker engine + v2e-compose stack on the services host
+  hosts: services
+  become: true
+  roles:
+    - role: geerlingguy.docker
+      vars:
+        docker_users:
+          - ansible
+        docker_daemon_options:
+          log-driver: json-file
+          log-opts:
+            max-size: "10m"
+            max-file: "3"
+          live-restore: true
+    - role: compose_stack

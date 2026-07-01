@@ -1,0 +1,8 @@
+{% for t in ai_identities_ssh_targets %}
+Host {{ t.alias }}
+    HostName {{ t.host }}
+    User {{ item }}
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    StrictHostKeyChecking accept-new
+{% endfor %}

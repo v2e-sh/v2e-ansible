@@ -1,3 +1,9 @@
-profile: basic
+---
+# Lint only our own Ansible content. Galaxy deps live in gitignored install dirs;
+# CI workflows and lint-tool configs are not Ansible and have their own linters.
 exclude_paths:
-  - roles/docker/   # vendored upstream role
+  - .galaxy/
+  - .ansible/
+  - .github/
+  - .pre-commit-config.yaml
+  - .yamllint

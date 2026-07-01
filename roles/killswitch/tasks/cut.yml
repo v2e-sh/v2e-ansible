@@ -1,0 +1,23 @@
+---
+# Surgical cut: drop everything sourced from the agent subnet on the router's
+# forward path (WAN egress + all inter-VLAN), but keep control<->agent reachable so
+# you can still SSH in to investigate. Lower rule numbers match first in VyOS, so
+# the two mgmt accepts sit ahead of the drop. The drop is stateless on source, so
+# it also tears down any in-flight agent sessions (e.g. an open exfil channel).
+
+- name: Kill switch — engage (drop agent forward traffic, keep mgmt)
+  vyos.vyos.vyos_config:
+    lines:
+      - "set firewall ipv4 forward filter rule {{ killswitch_rule_base }} description 'KILLSWITCH allow mgmt in'"
+      - "set firewall ipv4 forward filter rule {{ killswitch_rule_base }} action accept"
+      - "set firewall ipv4 forward filter rule {{ killswitch_rule_base }} source address {{ killswitch_mgmt_host }}"
+      - "set firewall ipv4 forward filter rule {{ killswitch_rule_base }} destination address {{ killswitch_agent_subnet }}"
+      - "set firewall ipv4 forward filter rule {{ killswitch_rule_base + 1 }} description 'KILLSWITCH allow mgmt return'"
+      - "set firewall ipv4 forward filter rule {{ killswitch_rule_base + 1 }} action accept"
+      - "set firewall ipv4 forward filter rule {{ killswitch_rule_base + 1 }} source address {{ killswitch_agent_subnet }}"
+      - "set firewall ipv4 forward filter rule {{ killswitch_rule_base + 1 }} destination address {{ killswitch_mgmt_host }}"
+      - "set firewall ipv4 forward filter rule {{ killswitch_rule_base + 10 }} description 'KILLSWITCH drop agent subnet'"
+      - "set firewall ipv4 forward filter rule {{ killswitch_rule_base + 10 }} action drop"
+      - "set firewall ipv4 forward filter rule {{ killswitch_rule_base + 10 }} source address {{ killswitch_agent_subnet }}"
+    comment: "ansible killswitch cut"
+    save: "{{ killswitch_save }}"

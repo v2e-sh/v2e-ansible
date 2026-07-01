@@ -1,0 +1,20 @@
+---
+# Apply general VyOS hardening via the vyos.vyos collection (network_cli).
+# These changes are non-session-dropping over a key-based connection, so a plain
+# commit (the module's default) is safe. Connectivity-breaking changes belong in
+# vyos-hardening-v2espec and must use VyOS commit-confirm.
+
+- name: Apply VyOS baseline hardening
+  vyos.vyos.vyos_config:
+    lines: "{{ vyos_hardening_lines }}"
+    comment: "ansible vyos-hardening-basic"
+    save: "{{ vyos_hardening_save }}"
+  when: vyos_hardening_lines | length > 0
+
+- name: Set pre-login banner
+  vyos.vyos.vyos_config:
+    lines:
+      - "set system login banner pre-login '{{ vyos_hardening_login_banner }}'"
+    comment: "ansible vyos-hardening-basic banner"
+    save: "{{ vyos_hardening_save }}"
+  when: vyos_hardening_login_banner | length > 0

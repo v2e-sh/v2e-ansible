@@ -1,0 +1,21 @@
+---
+# Dispatch on killswitch_state. Each branch is a small vyos_config change; none
+# touches the router's own input path from control, so a plain commit is safe and
+# can't lock you out of the router.
+
+- name: Validate killswitch_state
+  ansible.builtin.assert:
+    that: killswitch_state in ['cut', 'allow', 'cut-hard']
+    fail_msg: "killswitch_state must be one of: cut, allow, cut-hard"
+
+- name: Cut agent traffic (surgical)
+  ansible.builtin.include_tasks: cut.yml
+  when: killswitch_state == 'cut'
+
+- name: Restore agent traffic
+  ansible.builtin.include_tasks: allow.yml
+  when: killswitch_state == 'allow'
+
+- name: Cut agent traffic (hard — disable the VLAN interface)
+  ansible.builtin.include_tasks: cut-hard.yml
+  when: killswitch_state == 'cut-hard'

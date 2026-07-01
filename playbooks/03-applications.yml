@@ -1,0 +1,14 @@
+---
+# Phase 03 — applications: AI-agent identities (all Linux) + workbench (agent).
+
+- name: AI-agent identities across all Linux nodes
+  hosts: linux
+  become: true
+  roles:
+    - ai_identities
+
+- name: AI workbench on the agent node
+  hosts: agent
+  become: true
+  roles:
+    - ai_workbench

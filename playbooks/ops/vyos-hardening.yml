@@ -1,0 +1,13 @@
+---
+# Standalone operational — VyOS router hardening (network_cli). Run explicitly:
+#   ansible-playbook playbooks/ops/vyos-hardening.yml
+#   ansible-playbook playbooks/ops/vyos-hardening.yml --tags vyos
+# Every line in the role is safe over a key-based session (see roles/vyos_hardening_basic).
+
+- name: VyOS router hardening
+  hosts: vyos
+  gather_facts: false
+  tags:
+    - vyos
+  roles:
+    - vyos_hardening_basic

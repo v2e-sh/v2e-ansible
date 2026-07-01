@@ -1,0 +1,4 @@
+---
+# Preserve the exact AllowUsers from cloud-init (v2e-tf nodes.tf): control allows
+# only the cluster user. devsec.hardening.ssh_hardening becomes the sole owner.
+ssh_allow_users: "v2e"

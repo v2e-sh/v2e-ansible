@@ -1,0 +1,30 @@
+---
+# Per-AI-agent Unix identities + SSH mesh, provisioned by Ansible (not Terraform).
+# Same shape as the v2e/ansible meshes from v2e-tf: one keypair per account, the
+# hub holds the private key + ~/.ssh/config, every node authorizes the public key,
+# NOPASSWD sudo grants root. Scoped to the AI accounts and — by design — the VyOS
+# router is NOT a target: the contained party must not reach its own kill switch.
+
+# AI accounts created on every Linux node.
+ai_identities_roster:
+  - claude
+  - codex
+
+# The node that holds each account's private key and can SSH to the others. The
+# agent node is where the AI tooling runs (see the ai-workbench role).
+ai_identities_hub_host: "{{ groups['agent'][0] }}"
+
+# Login shell + NOPASSWD sudo (login itself is key-based).
+ai_identities_shell: /bin/bash
+ai_identities_sudo_nopasswd: true
+
+# Break-glass console password as a sha-512 crypt hash. Empty = locked password
+# (key-only). Supply from vault to enable a console fallback.
+ai_identities_password: ""
+
+# Hosts each account can reach from the hub, rendered into ~/.ssh/config. The
+# router is intentionally absent.
+ai_identities_ssh_targets:
+  - {alias: control, host: 10.1.1.10}
+  - {alias: services, host: 10.1.2.10}
+  - {alias: agent, host: 10.1.3.10}

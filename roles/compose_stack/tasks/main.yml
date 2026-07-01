@@ -1,0 +1,50 @@
+---
+# Deploy the v2e-compose stacks on the services node. geerlingguy.docker (run
+# before this role) provides the engine + compose plugin.
+
+- name: Assert required SOPS secrets are present
+  ansible.builtin.assert:
+    that:
+      - cf_dns_api_token | default('') | trim | length > 0
+      - tinyauth_auth_users | default('') | trim | length > 0
+    fail_msg: >-
+      compose_stack needs cf_dns_api_token and tinyauth_auth_users from the SOPS
+      group_vars/all.sops.yaml (delivered by TF-2). One or both are missing/empty
+      — set them (lowercase keys) in your sops_secrets_file and re-run.
+
+- name: Ensure git is installed (needed to clone v2e-compose)
+  ansible.builtin.apt:
+    name: git
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Clone the v2e-compose repository
+  ansible.builtin.git:
+    repo: "{{ compose_stack_repo_url }}"
+    dest: "{{ compose_stack_dir }}"
+    version: "{{ compose_stack_repo_version }}"
+
+- name: Create the shared external frontend network
+  community.docker.docker_network:
+    name: "{{ compose_stack_network }}"
+    state: present
+
+- name: Render the shared .env (non-secret config + SOPS secrets)
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ compose_stack_dir }}/.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Deploy each compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ compose_stack_dir }}/{{ item }}"
+    env_files:
+      - ../.env
+    state: present
+  loop: "{{ compose_stack_stacks }}"
+  loop_control:
+    label: "{{ item }}"

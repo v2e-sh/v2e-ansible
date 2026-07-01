@@ -1,0 +1,37 @@
+---
+# Task an AI agent on the agent node directly from control. Run from control as the
+# `ansible` user:
+#
+#   ansible-playbook playbooks/ops/task-agent.yml -e agent=claude -e 'task=Summarise the repo'
+#   ansible-playbook playbooks/ops/task-agent.yml -e agent=codex  -e 'task=Write a unit test for X'
+#
+# Runs one-shot/headless via the agent-run wrapper as the chosen AI account and
+# prints the result. For long-running work, wrap the task in tmux/systemd-run on the
+# agent node instead of using this synchronous playbook.
+
+- name: Task an AI agent
+  hosts: agent
+  gather_facts: false
+  vars:
+    agent: claude
+    task: ""
+  tasks:
+    - name: Require a task
+      ansible.builtin.assert:
+        that: task | length > 0
+        fail_msg: "Pass -e 'task=...' (and optionally -e agent=claude|codex)."
+
+    - name: Run the agent headless
+      become: true
+      become_user: "{{ agent }}"
+      ansible.builtin.command:
+        argv:
+          - agent-run
+          - "{{ agent }}"
+          - "{{ task }}"
+      register: agent_result
+      changed_when: false
+
+    - name: Show the agent output
+      ansible.builtin.debug:
+        var: agent_result.stdout_lines

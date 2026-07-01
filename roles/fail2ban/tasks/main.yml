@@ -1,0 +1,35 @@
+---
+# sshd brute-force protection. Carried over from the retired deb_hardening_basic
+# role — devsec.hardening does not provide fail2ban.
+
+- name: Install fail2ban (+ python3-systemd for the journal backend)
+  ansible.builtin.apt:
+    name:
+      - fail2ban
+      - python3-systemd
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: fail2ban_enabled
+
+- name: Enable the sshd jail (systemd backend)
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.d/sshd.local
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (fail2ban role).
+      [sshd]
+      enabled = true
+      # bookworm has no rsyslog/auth.log; sshd logs to the journal.
+      backend = systemd
+  notify: Restart fail2ban
+  when: fail2ban_enabled
+
+- name: Ensure fail2ban is enabled and running
+  ansible.builtin.systemd_service:
+    name: fail2ban
+    enabled: true
+    state: started
+  when: fail2ban_enabled

@@ -1,39 +1,14 @@
 ---
-# Phase 1 baseline. Run FROM the control node (controller = control) as the
-# `ansible` automation user. See README.md.
+# Unattended first-boot entry point. Run FROM control as the `ansible` user
+# (see README). Statically imports the phase playbooks in order; health_check in
+# 01-bootstrap is the fail-fast gate.
 #
-#   ping (smoke)  ->  baseline (all)  ->  patch (on demand)  ->  docker (services)
+# Operational playbooks are NOT imported here — run them explicitly from
+# playbooks/ops/ (killswitch, patch, vyos-hardening, agents, task-agent).
 
-- name: Smoke test — confirm the automation mesh can reach every node
-  hosts: all
-  gather_facts: false
-  tasks:
-    - name: Ping all managed hosts
-      ansible.builtin.ping:
-
-- name: Baseline configuration on all managed nodes
-  hosts: all
-  become: true
-  roles:
-    - baseline
-
-- name: Orchestrated full patch (on demand — run with --tags patch)
-  hosts: all
-  become: true
-  tags:
-    - patch
-    - never
-  roles:
-    - patch
-
-- name: Install Docker on the services host
-  hosts: services
-  become: true
-  roles:
-    - role: docker
-      vars:
-        # Keep the Compose v2 plugin (`docker compose ...`) installed.
-        docker_install_compose_plugin: true
-        # Users to add to the `docker` group (uncomment as needed):
-        # docker_users:
-        #   - ansible
+- name: Bootstrap phase (reachability, baseline OS, hardening)
+  import_playbook: playbooks/01-bootstrap.yml
+- name: Services phase (container runtime)
+  import_playbook: playbooks/02-services.yml
+- name: Applications phase (AI identities + workbench)
+  import_playbook: playbooks/03-applications.yml

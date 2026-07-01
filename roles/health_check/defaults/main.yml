@@ -1,0 +1,10 @@
+---
+# Thresholds + targets for the fail-fast preflight gate.
+health_check_connect_timeout: 30      # wait_for_connection per-node timeout (s)
+health_check_min_disk_percent: 15     # minimum free space on / (percent)
+health_check_min_mem_mb: 512          # minimum available memory (MB)
+health_check_intervlan_timeout: 10    # per-target TCP:22 probe timeout (s)
+# Nodes control must reach across VLANs (through the router), checked on :22.
+health_check_intervlan_targets:
+  - {name: services, host: 10.1.2.10}
+  - {name: agent, host: 10.1.3.10}
