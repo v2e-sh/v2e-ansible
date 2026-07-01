@@ -1,5 +1,6 @@
 # health_check
 
-Fail-fast preflight gate, run first in `01-bootstrap`. **ANS-1: scaffold only.**
-ANS-2 adds mesh `wait_for_connection`, disk/memory asserts, and inter-VLAN
-reachability so the rest of the run aborts early on an unhealthy node.
+Fail-fast preflight gate, run first in `01-bootstrap`. Aborts the whole run early
+if any node is unreachable (`wait_for_connection`), low on disk/memory (asserts),
+or if control can't reach the other nodes across VLANs on SSH. Thresholds and
+targets are in `defaults/main.yml`. Pure `ansible.builtin` — no collection deps.

@@ -1,6 +1,45 @@
 ---
-# ANS-1 scaffold. ANS-2 fills this with the real fail-fast gate:
-#   mesh wait_for_connection, disk/memory asserts, inter-VLAN reachability.
-- name: Health check placeholder (ANS-1 scaffold — no assertions yet)
-  ansible.builtin.debug:
-    msg: "health_check: scaffold — real checks land in ANS-2"
+# Fail-fast preflight gate. Runs first in 01-bootstrap so an unhealthy or
+# unreachable node aborts the run before hardening/config touches anything.
+# Pure ansible.builtin so it can never fail on a missing collection.
+
+- name: Wait for every managed node to be reachable
+  ansible.builtin.wait_for_connection:
+    timeout: "{{ health_check_connect_timeout }}"
+
+- name: Gather hardware facts for the resource asserts
+  ansible.builtin.setup:
+    gather_subset:
+      - hardware
+      - min
+
+- name: Assert sufficient free disk on /
+  ansible.builtin.assert:
+    that:
+      - (root_mount.size_available | float) / (root_mount.size_total | float) * 100 >= health_check_min_disk_percent
+    fail_msg: >-
+      Free space on / below {{ health_check_min_disk_percent }}% on {{ inventory_hostname }}
+      ({{ (root_mount.size_available / 1048576) | round | int }} MB free).
+    success_msg: "Disk OK on {{ inventory_hostname }}"
+  vars:
+    root_mount: "{{ ansible_mounts | selectattr('mount', 'equalto', '/') | first }}"
+
+- name: Assert sufficient available memory
+  ansible.builtin.assert:
+    that:
+      - ansible_memory_mb.nocache.free >= health_check_min_mem_mb
+    fail_msg: >-
+      Available memory below {{ health_check_min_mem_mb }} MB on {{ inventory_hostname }}
+      ({{ ansible_memory_mb.nocache.free }} MB free).
+    success_msg: "Memory OK on {{ inventory_hostname }}"
+
+- name: Inter-VLAN reachability — control reaches the other nodes on SSH
+  ansible.builtin.wait_for:
+    host: "{{ item.host }}"
+    port: 22
+    timeout: "{{ health_check_intervlan_timeout }}"
+  loop: "{{ health_check_intervlan_targets }}"
+  loop_control:
+    label: "{{ item.name }} ({{ item.host }}:22)"
+  when: inventory_hostname in groups['control']
+  changed_when: false
