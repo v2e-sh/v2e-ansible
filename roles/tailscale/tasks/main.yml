@@ -44,4 +44,14 @@
       parrot: debian
       "parrot security": debian
       "parrot os": debian
+    # ...and the install.yml routing gate (verified live: Parrot reports
+    # ansible_distribution="Parrot", which upstream's list doesn't contain, so
+    # the Debian install branch never ran and the service task failed).
+    tailscale_debian_family_distros:
+      - Ubuntu
+      - Debian
+      - Pop!_OS
+      - OSMC
+      - Linux Mint
+      - Parrot
   when: tailscale_authkey | default('') | length > 0
