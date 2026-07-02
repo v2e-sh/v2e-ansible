@@ -17,4 +17,4 @@ compose_stack_stacks:
 compose_stack_domain: "v2e.sh"
 compose_stack_internal_domain: "int.v2e.sh"
 compose_stack_acme_email: "admin@v2e.sh"
-compose_stack_cert_resolver: staging
+compose_stack_cert_resolver: production
