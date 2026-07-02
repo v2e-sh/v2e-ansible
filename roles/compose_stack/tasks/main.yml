@@ -25,18 +25,34 @@
     dest: "{{ compose_stack_dir }}"
     version: "{{ compose_stack_repo_version }}"
 
+# Source-tree permissions BEFORE the first `compose up`: images running as non-root
+# uids (grafana 472, loki 10001, prometheus 65534) must be able to read their
+# bind-mounted configs at first start, or they crash-loop until a later chmod +
+# restart-backoff happens to line up. Everything in the tree is public git content;
+# the secrets live only in .env (rendered below with its own tight mode) and in
+# runtime data dirs (excluded — traefik's acme.json must stay 0600).
+- name: Make the stack tree readable (operator rw via docker group; non-root images o+rX)
+  ansible.builtin.shell:
+    cmd: >-
+      chgrp -R docker {{ compose_stack_dir | quote }} &&
+      find {{ compose_stack_dir | quote }} -path '*/data' -prune -o -exec chmod g+rwX,o+rX {} +
+  changed_when: false
+
 - name: Create the shared external frontend network
   community.docker.docker_network:
     name: "{{ compose_stack_network }}"
     state: present
 
+# 0640 root:docker — docker-group members (the operator, the engine-adjacent
+# tooling) can read it for manual `docker compose` runs; docker-group membership
+# is root-equivalent anyway, so this adds no real exposure. World gets nothing.
 - name: Render the shared .env (non-secret config + SOPS secrets)
   ansible.builtin.template:
     src: env.j2
     dest: "{{ compose_stack_dir }}/.env"
     owner: root
-    group: root
-    mode: "0600"
+    group: docker
+    mode: "0640"
   no_log: true
 
 - name: Deploy each compose stack
@@ -49,9 +65,7 @@
   loop_control:
     label: "{{ item }}"
 
-# Make the stack visible/editable to a human operator: the compose files land in
-# /opt owned by root, which the cluster user can't even read. Add them to the docker
-# group, group-own the tree by docker (g+rwX), and symlink it into their home.
+# Human-operator conveniences: docker-group membership + a home symlink.
 - name: Make the deployed stack manageable by the operator
   when: compose_stack_manage_user | default('') | length > 0
   block:
@@ -60,17 +74,6 @@
         name: "{{ compose_stack_manage_user }}"
         groups: docker
         append: true
-
-    # Group-own by docker + group rwX so the operator can read/edit the compose files,
-    # but EXCLUDE any runtime data dir (e.g. traefik/data holds acme.json, which Traefik
-    # refuses unless it is 0600 — a blanket recurse would break cert issuance). chgrp is
-    # safe on those files (group has no access at 0600); only the mode must be left alone.
-    - name: Group-own the stack tree by docker (source rwX; runtime data untouched)
-      ansible.builtin.shell:
-        cmd: >-
-          chgrp -R docker {{ compose_stack_dir | quote }} &&
-          find {{ compose_stack_dir | quote }} -path '*/data' -prune -o -exec chmod g+rwX {} +
-      changed_when: false
 
     - name: Symlink the stack into the operator's home (~/v2e-compose)
       ansible.builtin.file:
