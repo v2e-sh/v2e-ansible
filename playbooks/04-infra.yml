@@ -1,0 +1,22 @@
+---
+# Phase 04 — infra appliance node: Docker runtime for the Technitium (DNS) + RustDesk
+# relay stacks (internal / Tailscale-only, deployed from v2e-compose like the services
+# node). This phase only readies the HOST with Docker. The DNS :53 handoff (disabling
+# the systemd-resolved stub so Technitium can bind the node's :53) and the stack deploy
+# are done deliberately in the infra_stack step, NOT here — a botched resolver switch
+# during an unattended first boot would break the node's own name resolution and fail
+# everything downstream.
+- name: Infra appliance node — Docker runtime (Technitium + RustDesk host)
+  hosts: infra
+  become: true
+  roles:
+    - role: geerlingguy.docker
+      vars:
+        docker_users:
+          - ansible
+        docker_daemon_options:
+          log-driver: json-file
+          log-opts:
+            max-size: "10m"
+            max-file: "3"
+          live-restore: true
