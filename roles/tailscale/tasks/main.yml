@@ -29,4 +29,19 @@
     # Deterministic runs: install if missing, don't chase the latest package on
     # every converge (the artis3n default is state=latest).
     state: present
+    # Passed as include params so they beat the role's own detection (set_fact):
+    # map derivative codenames to a base pkgs.tailscale.com serves, and extend
+    # the upstream distro map with Parrot (Debian base).
+    apt_codename: >-
+      {{ tailscale_node_codename_map.get(ansible_distribution_release | lower,
+                                         ansible_distribution_release | lower) }}
+    tailscale_debian_distro:
+      pop!_os: ubuntu
+      ubuntu: ubuntu
+      debian: debian
+      osmc: debian
+      "linux mint": ubuntu
+      parrot: debian
+      "parrot security": debian
+      "parrot os": debian
   when: tailscale_authkey | default('') | length > 0
