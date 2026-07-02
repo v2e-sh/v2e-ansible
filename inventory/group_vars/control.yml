@@ -19,5 +19,5 @@ control_desktop_nameservers:
   - 10.1.0.10
 # RustDesk: pin the exact release + .deb sha256 (empty skips the install with a
 # warning; fill from the live node with `dpkg -s rustdesk` or pick a release).
-rustdesk_client_version: ""
-rustdesk_client_deb_sha256: ""
+rustdesk_client_version: "1.4.8"
+rustdesk_client_deb_sha256: "c426f0a50ce141be3babf653ee920f43c30cf5159deb7d46b0a58ee07d5f547e"
