@@ -12,3 +12,5 @@
   import_playbook: playbooks/02-services.yml
 - name: Applications phase (AI identities + workbench)
   import_playbook: playbooks/03-applications.yml
+- name: Infra phase (Docker runtime on the Technitium/RustDesk appliance node)
+  import_playbook: playbooks/04-infra.yml
