@@ -1,14 +1,12 @@
 ---
-# Phase 03 — applications: AI-agent identities (all Linux) + workbench (agent).
+# Phase 03 — applications: AI-agent identities + workbench, both on the agent node.
+# The claude/codex accounts exist only where the workbench actually runs (agent) —
+# creating them on every Linux node was unused login surface (control/services should
+# carry only the v2e + ansible mesh users).
 
-- name: AI-agent identities across all Linux nodes
-  hosts: linux
-  become: true
-  roles:
-    - ai_identities
-
-- name: AI workbench on the agent node
+- name: AI-agent identities + workbench on the agent node
   hosts: agent
   become: true
   roles:
+    - ai_identities
     - ai_workbench
