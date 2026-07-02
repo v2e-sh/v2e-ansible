@@ -14,6 +14,8 @@
   ansible.builtin.set_fact:
     tailscale_node_args: >-
       {{ ((['--ssh'] if tailscale_node_ssh | bool else [])
+          + (['--hostname=' ~ tailscale_node_hostname]
+             if tailscale_node_hostname | length > 0 else [])
           + (['--advertise-routes=' ~ tailscale_node_advertise_routes]
              if tailscale_node_advertise_routes | length > 0 else [])
           + (['--advertise-exit-node']

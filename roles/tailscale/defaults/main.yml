@@ -8,6 +8,11 @@ tailscale_node_ssh: true
 # Route approval + split-DNS (int.<domain> → infra) stay MANUAL in the Tailscale
 # admin console — they are tailnet-side settings, not node-side.
 tailscale_node_advertise_routes: ""
+# Tailnet machine name (what shows in the exit-node picker / MagicDNS). Empty =
+# use the OS hostname. Set this to give an exit node a clear label (e.g. "home")
+# without renaming the underlying VM. NOTE: an admin-console rename would override
+# this; we don't set one, so this flag is authoritative + survives re-registration.
+tailscale_node_hostname: ""
 # Advertise this node as an exit node (route other tailnet devices' internet
 # traffic out through it). Enables IP forwarding (v4+v6) as Tailscale requires.
 # Still needs one-time approval in the admin console. On a lab node this yields a
