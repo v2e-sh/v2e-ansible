@@ -16,10 +16,28 @@
       {{ ((['--ssh'] if tailscale_node_ssh | bool else [])
           + (['--advertise-routes=' ~ tailscale_node_advertise_routes]
              if tailscale_node_advertise_routes | length > 0 else [])
+          + (['--advertise-exit-node']
+             if tailscale_node_advertise_exit_node | bool else [])
           + ([tailscale_node_extra_args]
              if tailscale_node_extra_args | length > 0 else []))
          | join(' ') }}
   when: tailscale_authkey | default('') | length > 0
+
+# Exit nodes must forward packets between interfaces. Tailscale's own docs set
+# these; make them explicit + persistent so a reboot keeps the node exit-capable.
+- name: Enable IP forwarding for exit-node operation
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: "1"
+    sysctl_set: true
+    state: present
+    reload: true
+  loop:
+    - net.ipv4.ip_forward
+    - net.ipv6.conf.all.forwarding
+  when:
+    - tailscale_authkey | default('') | length > 0
+    - tailscale_node_advertise_exit_node | bool
 
 - name: Install + bring up Tailscale (artis3n.tailscale)
   ansible.builtin.include_role:

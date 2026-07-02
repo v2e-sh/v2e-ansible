@@ -17,3 +17,7 @@ collections:
     version: "10.6.0"
   - name: community.sops
     version: "2.3.0"
+  # Used directly by roles/tailscale (sysctl for exit-node forwarding); also a
+  # transitive devsec.hardening dep — pin it so it's explicit + Renovate-tracked.
+  - name: ansible.posix
+    version: "2.2.0"
