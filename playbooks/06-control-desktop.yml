@@ -1,0 +1,11 @@
+---
+# Phase 06 — control's operator desktop: lightdm autologin + compositor off +
+# resolver → internal DNS, then the RustDesk client (which needs that X11
+# session). Both roles skip their not-yet-pinned pieces with a warning instead of
+# failing the unattended run.
+- name: Control desktop + RustDesk client
+  hosts: control
+  become: true
+  roles:
+    - control_desktop
+    - rustdesk_client

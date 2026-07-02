@@ -5,12 +5,13 @@
 - name: Assert required SOPS secrets are present
   ansible.builtin.assert:
     that:
-      - cf_dns_api_token | default('') | trim | length > 0
-      - tinyauth_auth_users | default('') | trim | length > 0
+      - lookup('ansible.builtin.vars', item, default='') | trim | length > 0
     fail_msg: >-
-      compose_stack needs cf_dns_api_token and tinyauth_auth_users from the SOPS
-      group_vars/all.sops.yaml (delivered by TF-2). One or both are missing/empty
-      — set them (lowercase keys) in your sops_secrets_file and re-run.
+      compose_stack needs '{{ item }}' from the SOPS group_vars/all.sops.yaml
+      (delivered by TF-2). It is missing/empty — set it (lowercase key) in your
+      sops_secrets_file and re-run.
+    quiet: true
+  loop: "{{ compose_stack_required_secrets }}"
 
 - name: Ensure git is installed (needed to clone v2e-compose)
   ansible.builtin.apt:
@@ -42,6 +43,7 @@
   community.docker.docker_network:
     name: "{{ compose_stack_network }}"
     state: present
+  when: compose_stack_network | default('') | length > 0
 
 # 0640 root:docker — docker-group members (the operator, the engine-adjacent
 # tooling) can read it for manual `docker compose` runs; docker-group membership

@@ -1,0 +1,32 @@
+---
+# Join the tailnet (codifies the hand-run `tailscale up` — HANDOVER §4/ANS-4).
+# Deliberately skips (with a visible warning) when no auth key is in SOPS, so the
+# unattended first boot never fails on a missing tailnet credential.
+
+- name: Warn — tailscale_authkey not set, skipping tailnet join
+  ansible.builtin.debug:
+    msg: >-
+      No tailscale_authkey in the SOPS secrets — skipping. Mint a REUSABLE auth
+      key in the Tailscale admin console, add it to secrets.sops.yaml, re-run.
+  when: tailscale_authkey | default('') | length == 0
+
+- name: Compose the `tailscale up` arguments
+  ansible.builtin.set_fact:
+    tailscale_node_args: >-
+      {{ ((['--ssh'] if tailscale_node_ssh | bool else [])
+          + (['--advertise-routes=' ~ tailscale_node_advertise_routes]
+             if tailscale_node_advertise_routes | length > 0 else [])
+          + ([tailscale_node_extra_args]
+             if tailscale_node_extra_args | length > 0 else []))
+         | join(' ') }}
+  when: tailscale_authkey | default('') | length > 0
+
+- name: Install + bring up Tailscale (artis3n.tailscale)
+  ansible.builtin.include_role:
+    name: artis3n.tailscale
+  vars:
+    tailscale_args: "{{ tailscale_node_args }}"
+    # Deterministic runs: install if missing, don't chase the latest package on
+    # every converge (the artis3n default is state=latest).
+    state: present
+  when: tailscale_authkey | default('') | length > 0

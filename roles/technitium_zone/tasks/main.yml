@@ -1,0 +1,86 @@
+---
+# Codifies the hand-applied Technitium zone (HANDOVER §4): create the internal
+# zone, point the wildcard (and apex) at the services node, add per-node A
+# records. All calls go to the local console API; `overwrite=true` on record adds
+# makes re-runs converge instead of erroring. Tasks carrying the password/token
+# are no_log.
+
+- name: Assert the zone role is configured
+  ansible.builtin.assert:
+    that:
+      - technitium_zone_name | length > 0
+      - technitium_zone_wildcard_target | length > 0
+      - technitium_admin_password | default('') | length > 0
+    fail_msg: >-
+      technitium_zone needs technitium_zone_name + technitium_zone_wildcard_target
+      (group_vars/infra.yml) and technitium_admin_password (SOPS).
+    quiet: true
+
+# Also the readiness gate: the technitium container was just (re)created by
+# compose_stack and takes a few seconds to serve the console.
+- name: Log in to the Technitium console (waits for it to come up)
+  ansible.builtin.uri:
+    url: "{{ technitium_zone_api }}/api/user/login"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      user: "{{ technitium_zone_admin_user }}"
+      pass: "{{ technitium_admin_password }}"
+    return_content: true
+  register: technitium_login
+  retries: "{{ technitium_zone_wait_retries }}"
+  delay: "{{ technitium_zone_wait_delay }}"
+  until:
+    - technitium_login.status | default(0) == 200
+    - (technitium_login.json.status | default('')) == 'ok'
+  no_log: true
+
+- name: Read the zone list
+  ansible.builtin.uri:
+    url: "{{ technitium_zone_api }}/api/zones/list?token={{ technitium_login.json.token }}"
+    return_content: true
+  register: technitium_zones
+  no_log: true
+
+- name: Create the internal zone (primary)
+  ansible.builtin.uri:
+    url: >-
+      {{ technitium_zone_api }}/api/zones/create?token={{ technitium_login.json.token
+      }}&zone={{ technitium_zone_name }}&type=Primary
+    return_content: true
+  register: technitium_zone_create
+  failed_when: (technitium_zone_create.json.status | default('')) != 'ok'
+  changed_when: true
+  when: technitium_zone_name not in
+        (technitium_zones.json.response.zones | default([]) | map(attribute='name') | list)
+  no_log: true
+
+- name: Ensure the apex + wildcard A records (→ services/Traefik)
+  ansible.builtin.uri:
+    url: >-
+      {{ technitium_zone_api }}/api/zones/records/add?token={{ technitium_login.json.token
+      }}&domain={{ item }}&zone={{ technitium_zone_name }}&type=A&ttl=300&overwrite=true&ipAddress={{ technitium_zone_wildcard_target }}
+    return_content: true
+  register: technitium_record
+  failed_when: (technitium_record.json.status | default('')) != 'ok'
+  changed_when: false  # overwrite=true is enforcement; the API doesn't report a diff
+  loop:
+    - "{{ technitium_zone_name }}"
+    - "*.{{ technitium_zone_name }}"
+  no_log: true
+  loop_control:
+    label: "{{ item }} → {{ technitium_zone_wildcard_target }}"
+
+- name: Ensure the per-node A records
+  ansible.builtin.uri:
+    url: >-
+      {{ technitium_zone_api }}/api/zones/records/add?token={{ technitium_login.json.token
+      }}&domain={{ item.key }}.{{ technitium_zone_name }}&zone={{ technitium_zone_name }}&type=A&ttl=300&overwrite=true&ipAddress={{ item.value }}
+    return_content: true
+  register: technitium_record
+  failed_when: (technitium_record.json.status | default('')) != 'ok'
+  changed_when: false
+  loop: "{{ technitium_zone_records | dict2items }}"
+  no_log: true
+  loop_control:
+    label: "{{ item.key }}.{{ technitium_zone_name }} → {{ item.value }}"

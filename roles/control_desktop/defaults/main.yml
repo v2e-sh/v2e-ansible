@@ -1,0 +1,24 @@
+---
+# Control-node desktop settings (codifies the hand-applied config — HANDOVER §4).
+# Every knob is a variable per the owner's rule.
+
+# lightdm autologin — RustDesk needs an active X11 session, so the desktop must
+# come up without a manual login. plasmax11 = KDE on X11 (RustDesk can't drive
+# Wayland here).
+control_desktop_autologin_user: v2e
+control_desktop_autologin_session: plasmax11
+
+# KDE compositing off — remote-desktop smoothness over eye candy.
+control_desktop_disable_compositing: true
+
+# Point the node's resolver at the internal DNS (Technitium on infra) so
+# int.<domain> resolves in the desktop browser. NetworkManager is told to stop
+# managing resolv.conf (dns=none) and the file is written statically.
+control_desktop_manage_resolv: true
+control_desktop_nameservers:
+  - 10.1.0.10
+
+# Optional /etc/hosts shim: { <fqdn>: <ip>, ... }. Empty = the managed block is
+# removed. Kept as a variable because the live lab carried one during bring-up
+# (pre-Technitium) — capture the live entries before enabling, else leave empty.
+control_desktop_hosts_entries: {}

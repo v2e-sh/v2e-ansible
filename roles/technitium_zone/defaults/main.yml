@@ -1,0 +1,16 @@
+---
+# Declarative content for the Technitium internal zone (runs on the infra node,
+# against the local console API). The admin password (technitium_admin_password)
+# comes from SOPS — never set it here.
+technitium_zone_api: "http://127.0.0.1:5380"
+technitium_zone_admin_user: admin
+# The internal-only zone the lab serves (apps live under it behind Traefik).
+technitium_zone_name: ""
+# Every name under the zone resolves here unless overridden below — the services
+# node, where Traefik terminates *.{{ technitium_zone_name }}.
+technitium_zone_wildcard_target: ""
+# Extra A records inside the zone: { <label>: <ip>, ... } → <label>.<zone>.
+technitium_zone_records: {}
+# How long to wait for the console to come up after the stack deploy (seconds).
+technitium_zone_wait_retries: 30
+technitium_zone_wait_delay: 5

@@ -1,0 +1,13 @@
+---
+# Phase 05 — tailnet access (ANS-4): control (subnet router for the lab supernet)
+# and infra (so the DNS/relay appliance is reachable directly from the tailnet).
+# Per-node args live in group_vars/{control,infra}.yml; the auth key comes from
+# SOPS (tailscale_authkey) and the role skips gracefully when it's absent.
+#
+# Tailnet-side settings stay MANUAL in the admin console: approve control's
+# advertised route (10.1.0.0/16) and set split-DNS int.<domain> → 10.1.0.10.
+- name: Tailnet join — control + infra
+  hosts: control:infra
+  become: true
+  roles:
+    - tailscale

@@ -1,0 +1,17 @@
+---
+# RustDesk client on the control desktop (codifies the hand-install — HANDOVER §4).
+# Access model: Direct IP over the tailnet (no public rendezvous server, no relay
+# config needed on the client) + an unattended password from SOPS
+# (rustdesk_unattended_password).
+#
+# Version + checksum are pinned EXACT (Renovate-style: bump deliberately). Empty
+# version = role skips with a warning, so the unattended run never breaks on it.
+# Fill from the live node (`dpkg -s rustdesk`) or pin the release you want:
+rustdesk_client_version: ""
+rustdesk_client_deb_url: >-
+  https://github.com/rustdesk/rustdesk/releases/download/{{ rustdesk_client_version
+  }}/rustdesk-{{ rustdesk_client_version }}-x86_64.deb
+# sha256 of the .deb; empty skips the checksum (pin it for prod).
+rustdesk_client_deb_sha256: ""
+# Accept Direct-IP connections (the tailnet path). RustDesk's config key.
+rustdesk_client_direct_ip_access: true

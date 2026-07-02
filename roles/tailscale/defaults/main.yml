@@ -1,0 +1,12 @@
+---
+# Wrapper around artis3n.tailscale (pinned in requirements.yml). The auth key
+# (tailscale_authkey) comes from SOPS — use a REUSABLE key (M2: an ephemeral key
+# drops the node from the tailnet on reboot). Per-node behaviour is set in
+# group_vars (control advertises the lab supernet; infra just joins).
+tailscale_node_ssh: true
+# Subnet(s) this node advertises, e.g. "10.1.0.0/16" on control. Empty = none.
+# Route approval + split-DNS (int.<domain> → infra) stay MANUAL in the Tailscale
+# admin console — they are tailnet-side settings, not node-side.
+tailscale_node_advertise_routes: ""
+# Free-form extra `tailscale up` args (e.g. "--advertise-exit-node").
+tailscale_node_extra_args: ""

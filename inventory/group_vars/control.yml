@@ -2,3 +2,22 @@
 # Preserve the exact AllowUsers from cloud-init (v2e-tf nodes.tf): control allows
 # only the cluster user. devsec.hardening.ssh_hardening becomes the sole owner.
 ssh_allow_users: "v2e"
+
+# --- tailscale (phase 05) ---
+# control is the subnet router: the mac reaches every lab subnet through it.
+# Route approval + split-DNS (int.v2e.sh → 10.1.0.10) stay manual in the admin
+# console. Auth key = tailscale_authkey (SOPS); use a REUSABLE key.
+tailscale_node_ssh: true
+tailscale_node_advertise_routes: "10.1.0.0/16"
+
+# --- control_desktop / rustdesk_client (phase 06) ---
+control_desktop_autologin_user: v2e
+control_desktop_autologin_session: plasmax11
+control_desktop_disable_compositing: true
+# Desktop browser resolves int.v2e.sh via Technitium (infra).
+control_desktop_nameservers:
+  - 10.1.0.10
+# RustDesk: pin the exact release + .deb sha256 (empty skips the install with a
+# warning; fill from the live node with `dpkg -s rustdesk` or pick a release).
+rustdesk_client_version: ""
+rustdesk_client_deb_sha256: ""
