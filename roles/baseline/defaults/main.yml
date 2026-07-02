@@ -12,6 +12,10 @@ baseline_packages:
   - systemd-timesyncd
   - unattended-upgrades
   - python3-apt
+  # acl: lets Ansible set file ACLs when a play uses `become_user` to drop to an
+  # unprivileged account (e.g. ai_workbench preseeding the claude/codex accounts).
+  # Without it Ansible falls back to an invalid `chmod A+...` and the task fails.
+  - acl
 
 # Security-net unattended-upgrades: autonomous *security* patching between the
 # orchestrated (alemorvan.patchmanagement) runs. Reboots are owned by the
