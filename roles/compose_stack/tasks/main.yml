@@ -20,6 +20,18 @@
     update_cache: true
     cache_valid_time: 3600
 
+# Keep the repo top-level ROOT-owned: git 2.35+ refuses to operate on a repo
+# whose directory owner differs from the executing user ("dubious ownership").
+# Also heals trees the pre-fix symlink task chowned to the operator (below).
+- name: Ensure the stack dir exists and is root-owned (git safe-ownership)
+  ansible.builtin.file:
+    path: "{{ compose_stack_dir }}"
+    state: directory
+    owner: root
+    group: docker
+    mode: "0775"
+    follow: false
+
 - name: Clone the v2e-compose repository
   ansible.builtin.git:
     repo: "{{ compose_stack_repo_url }}"
@@ -77,6 +89,9 @@
         groups: docker
         append: true
 
+    # follow=false: set ownership on the LINK, not the target — with the default
+    # follow=true this task silently chowned /opt/v2e-compose to the operator,
+    # which broke git's safe-ownership check on every subsequent converge.
     - name: Symlink the stack into the operator's home (~/v2e-compose)
       ansible.builtin.file:
         src: "{{ compose_stack_dir }}"
@@ -85,3 +100,4 @@
         owner: "{{ compose_stack_manage_user }}"
         group: "{{ compose_stack_manage_user }}"
         force: true
+        follow: false

@@ -10,3 +10,8 @@ tailscale_node_ssh: true
 tailscale_node_advertise_routes: ""
 # Free-form extra `tailscale up` args (e.g. "--advertise-exit-node").
 tailscale_node_extra_args: ""
+# Debian-family codenames pkgs.tailscale.com doesn't serve, mapped to their base.
+# Parrot 'echo' = Debian 13 'trixie' (verified: /stable/debian/echo 404s) — the
+# same derivative-codename trap as the cloudflared apt repo (see RUNBOOK gotchas).
+tailscale_node_codename_map:
+  echo: trixie
