@@ -8,7 +8,14 @@ tailscale_node_ssh: true
 # Route approval + split-DNS (int.<domain> → infra) stay MANUAL in the Tailscale
 # admin console — they are tailnet-side settings, not node-side.
 tailscale_node_advertise_routes: ""
-# Free-form extra `tailscale up` args (e.g. "--advertise-exit-node").
+# Advertise this node as an exit node (route other tailnet devices' internet
+# traffic out through it). Enables IP forwarding (v4+v6) as Tailscale requires.
+# Still needs one-time approval in the admin console. On a lab node this yields a
+# home/residential egress IP — the "no-VPN" exit for sites that block VPN ranges.
+# (For a Mullvad exit, use the Tailscale↔Mullvad add-on instead — no node config.)
+tailscale_node_advertise_exit_node: false
+# Free-form extra `tailscale up` args (e.g. "--advertise-exit-node" is handled by
+# the flag above; use this only for anything not otherwise modelled).
 tailscale_node_extra_args: ""
 # Debian-family codenames pkgs.tailscale.com doesn't serve, mapped to their base.
 # Parrot 'echo' = Debian 13 'trixie' (verified: /stable/debian/echo 404s) — the
