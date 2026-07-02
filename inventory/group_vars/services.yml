@@ -12,6 +12,8 @@ compose_stack_stacks:
   # COMPOSE-3 — ops tooling, both TinyAuth-gated (arcane replaces the planned dockge):
   - semaphore
   - arcane
+  # Phase G — observability (grafana + uptime-kuma gated; rest internal):
+  - observability
 compose_stack_domain: "v2e.sh"
 compose_stack_acme_email: "admin@v2e.sh"
 compose_stack_cert_resolver: staging
