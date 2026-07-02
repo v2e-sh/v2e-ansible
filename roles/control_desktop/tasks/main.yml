@@ -3,6 +3,16 @@
 # active desktop session (and any RustDesk connection riding it). Autologin
 # changes take effect on the next boot.
 
+# The Parrot image ships /etc/lightdm but NOT the conf.d drop-in dir (verified on
+# the 2026-07-02 rebuild — its absence failed this role's first task).
+- name: Ensure the lightdm drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/lightdm/lightdm.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Configure lightdm autologin
   ansible.builtin.copy:
     dest: /etc/lightdm/lightdm.conf.d/50-v2e-autologin.conf
@@ -14,6 +24,15 @@
     owner: root
     group: root
     mode: "0644"
+
+- name: Ensure the autologin user's ~/.config exists
+  ansible.builtin.file:
+    path: "/home/{{ control_desktop_autologin_user }}/.config"
+    state: directory
+    owner: "{{ control_desktop_autologin_user }}"
+    group: "{{ control_desktop_autologin_user }}"
+    mode: "0755"
+  when: control_desktop_disable_compositing | bool
 
 - name: Disable KDE compositing for the autologin user
   ansible.builtin.ini_file:
@@ -30,9 +49,11 @@
 - name: Point the resolver at the internal DNS
   when: control_desktop_manage_resolv | bool
   block:
+    # Same path cloud-init (v2e-tf) already writes at first boot — converge it
+    # rather than adding a second drop-in with the same directive.
     - name: Tell NetworkManager to leave resolv.conf alone
       ansible.builtin.copy:
-        dest: /etc/NetworkManager/conf.d/90-v2e-dns.conf
+        dest: /etc/NetworkManager/conf.d/90-dns-none.conf
         content: |
           # Managed by Ansible (control_desktop): resolv.conf is written statically.
           [main]
