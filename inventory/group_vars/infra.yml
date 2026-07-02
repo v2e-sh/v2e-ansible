@@ -10,6 +10,7 @@ compose_stack_dir: /opt/v2e-compose
 compose_stack_stacks:
   - technitium
   - rustdesk
+  # - mullvad-exit   # <-- uncomment after the Mullvad creds land in SOPS (see below)
 # Both stacks are host-network — no shared Traefik bridge on this node.
 compose_stack_network: ""
 # .env only needs DOMAIN (DNS_SERVER_DOMAIN=infra.int.${DOMAIN}) + the technitium
@@ -41,10 +42,18 @@ technitium_zone_records:
 # infra joins the tailnet and doubles as the "no-VPN" exit node: selecting it from
 # the Tailscale menu routes internet traffic out the home/residential WAN (for
 # sites that block VPN ranges). Needs one-time approval in the admin console.
-# The Mullvad (privacy) exit is the Tailscale↔Mullvad add-on — no node config.
+# The Mullvad (privacy) exit is a separate self-hosted stack — see below.
 tailscale_node_ssh: true
 tailscale_node_advertise_routes: ""
 tailscale_node_advertise_exit_node: true
 # Label this exit node "home" in the Tailscale picker (it egresses the home WAN).
 # The VM / lab identity stays "infra"; only the tailnet machine name changes.
 tailscale_node_hostname: home
+
+# --- mullvad-exit stack (the "mullvad" privacy exit; gluetun + tailscale sidecar) ---
+# A SECOND, namespace-isolated exit node egressing via Mullvad (distinct tailnet
+# identity from the host "home" exit). Non-secret location pick here; the WireGuard
+# key/address + tailscale_authkey come from SOPS. Enable via compose_stack_stacks
+# above once the mullvad_wireguard_* values are in SOPS.
+mullvad_server_cities: ""        # e.g. "Amsterdam" — empty = Mullvad default
+mullvad_exit_hostname: mullvad
