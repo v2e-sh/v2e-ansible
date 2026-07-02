@@ -10,7 +10,7 @@ compose_stack_dir: /opt/v2e-compose
 compose_stack_stacks:
   - technitium
   - rustdesk
-  # - mullvad-exit   # <-- uncomment after the Mullvad creds land in SOPS (see below)
+  - mullvad-exit   # Mullvad creds are in SOPS (mullvad_wireguard_*); "mullvad" exit node
 # Both stacks are host-network — no shared Traefik bridge on this node.
 compose_stack_network: ""
 # .env only needs DOMAIN (DNS_SERVER_DOMAIN=infra.int.${DOMAIN}) + the technitium
@@ -18,6 +18,10 @@ compose_stack_network: ""
 compose_stack_domain: "v2e.sh"
 compose_stack_required_secrets:
   - technitium_admin_password
+  # mullvad-exit needs these (WireGuard creds + the reused tailscale key)
+  - mullvad_wireguard_private_key
+  - mullvad_wireguard_addresses
+  - tailscale_authkey
 
 # Upstream resolvers: the node's own resolv.conf (04-infra pins it — the node
 # never resolves through its own container) and Technitium's forwarders
