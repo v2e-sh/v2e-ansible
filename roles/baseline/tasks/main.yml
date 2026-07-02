@@ -32,6 +32,8 @@
 # --- Time sync (timedatectl set-ntp enables + starts systemd-timesyncd) ---
 - name: Check current NTP synchronization state
   ansible.builtin.command: timedatectl show -p NTP --value
+  environment:
+    LC_ALL: C  # locale-independent output for the stdout comparison below
   register: baseline_ntp_state
   changed_when: false
   check_mode: false
@@ -44,6 +46,8 @@
 # --- Timezone (timedatectl, guarded for idempotency) ---
 - name: Check current timezone
   ansible.builtin.command: timedatectl show -p Timezone --value
+  environment:
+    LC_ALL: C  # locale-independent output for the stdout comparison below
   register: baseline_tz_state
   changed_when: false
   check_mode: false

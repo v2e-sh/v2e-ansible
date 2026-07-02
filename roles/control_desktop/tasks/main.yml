@@ -83,7 +83,12 @@
         name: NetworkManager
         state: reloaded
       when: control_desktop_nm_conf is changed
-      failed_when: false  # NM absent (headless rebuild without the desktop image) is fine
+      register: control_desktop_nm_reload
+      # Tolerate ONLY a genuinely-absent NM (headless rebuild without the desktop
+      # image); a real reload failure must still surface.
+      failed_when:
+        - control_desktop_nm_reload is failed
+        - "'Could not find the requested service' not in (control_desktop_nm_reload.msg | default(''))"
 
 - name: Manage the /etc/hosts shim block
   ansible.builtin.blockinfile:

@@ -14,3 +14,7 @@ technitium_zone_records: {}
 # How long to wait for the console to come up after the stack deploy (seconds).
 technitium_zone_wait_retries: 30
 technitium_zone_wait_delay: 5
+# Light retry on the post-login API calls (the console is already up by then, so a
+# few short retries just ride out transient blips without hanging on a real error).
+technitium_zone_api_retries: 3
+technitium_zone_api_delay: 2

@@ -40,6 +40,12 @@
     url: "{{ technitium_zone_api }}/api/zones/list?token={{ technitium_login.json.token }}"
     return_content: true
   register: technitium_zones
+  retries: "{{ technitium_zone_api_retries }}"
+  delay: "{{ technitium_zone_api_delay }}"
+  until:
+    - technitium_zones.status | default(0) == 200
+    - (technitium_zones.json.status | default('')) == 'ok'
+  failed_when: (technitium_zones.json.status | default('')) != 'ok'
   no_log: true
 
 - name: Create the internal zone (primary)
@@ -49,6 +55,11 @@
       }}&zone={{ technitium_zone_name }}&type=Primary
     return_content: true
   register: technitium_zone_create
+  retries: "{{ technitium_zone_api_retries }}"
+  delay: "{{ technitium_zone_api_delay }}"
+  until:
+    - technitium_zone_create.status | default(0) == 200
+    - (technitium_zone_create.json.status | default('')) == 'ok'
   failed_when: (technitium_zone_create.json.status | default('')) != 'ok'
   changed_when: true
   when: technitium_zone_name not in
@@ -62,6 +73,11 @@
       }}&domain={{ item }}&zone={{ technitium_zone_name }}&type=A&ttl=300&overwrite=true&ipAddress={{ technitium_zone_wildcard_target }}
     return_content: true
   register: technitium_record
+  retries: "{{ technitium_zone_api_retries }}"
+  delay: "{{ technitium_zone_api_delay }}"
+  until:
+    - technitium_record.status | default(0) == 200
+    - (technitium_record.json.status | default('')) == 'ok'
   failed_when: (technitium_record.json.status | default('')) != 'ok'
   changed_when: false  # overwrite=true is enforcement; the API doesn't report a diff
   loop:
@@ -78,6 +94,11 @@
       }}&domain={{ item.key }}.{{ technitium_zone_name }}&zone={{ technitium_zone_name }}&type=A&ttl=300&overwrite=true&ipAddress={{ item.value }}
     return_content: true
   register: technitium_record
+  retries: "{{ technitium_zone_api_retries }}"
+  delay: "{{ technitium_zone_api_delay }}"
+  until:
+    - technitium_record.status | default(0) == 200
+    - (technitium_record.json.status | default('')) == 'ok'
   failed_when: (technitium_record.json.status | default('')) != 'ok'
   changed_when: false
   loop: "{{ technitium_zone_records | dict2items }}"

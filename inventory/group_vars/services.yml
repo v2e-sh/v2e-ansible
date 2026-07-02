@@ -5,6 +5,10 @@ ssh_allow_users: "v2e ansible"
 # (cf_dns_api_token, tinyauth_auth_users) come from SOPS group_vars/all.yml. ---
 compose_stack_repo_url: "https://github.com/v2e-sh/v2e-compose.git"
 compose_stack_dir: /opt/v2e-compose
+# Fail-fast before deploy: the traefik (DNS-01) + tinyauth secrets must be present.
+compose_stack_required_secrets:
+  - cf_dns_api_token
+  - tinyauth_auth_users
 compose_stack_stacks:
   - traefik
   - tinyauth

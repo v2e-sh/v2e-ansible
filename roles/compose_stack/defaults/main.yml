@@ -16,11 +16,10 @@ compose_stack_domain: ""
 compose_stack_acme_email: ""
 compose_stack_cert_resolver: staging
 # SOPS keys that must be non-empty on THIS host group before deploying — the
-# fail-fast guard against a half-shipped secrets file. Per-group overrides:
-# services needs the traefik/tinyauth pair, infra needs technitium's password.
-compose_stack_required_secrets:
-  - cf_dns_api_token
-  - tinyauth_auth_users
+# fail-fast guard against a half-shipped secrets file. Empty here on purpose: each
+# consuming group states its own required set (services = the traefik/tinyauth pair,
+# infra = technitium's password) so a new group never silently inherits another's.
+compose_stack_required_secrets: []
 # Human operator who should be able to see/edit the deployed stack (added to the
 # docker group; the stack dir is group-owned by docker and symlinked into their
 # home as ~/v2e-compose). Empty string disables the convenience (root-only stack).
