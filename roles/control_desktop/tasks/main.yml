@@ -1,0 +1,96 @@
+---
+# NOTE: lightdm is deliberately NOT restarted on change — that would kill the
+# active desktop session (and any RustDesk connection riding it). Autologin
+# changes take effect on the next boot.
+
+# The Parrot image ships /etc/lightdm but NOT the conf.d drop-in dir (verified on
+# the 2026-07-02 rebuild — its absence failed this role's first task).
+- name: Ensure the lightdm drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/lightdm/lightdm.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure lightdm autologin
+  ansible.builtin.copy:
+    dest: /etc/lightdm/lightdm.conf.d/50-v2e-autologin.conf
+    content: |
+      # Managed by Ansible (control_desktop). RustDesk needs a live X11 session.
+      [Seat:*]
+      autologin-user={{ control_desktop_autologin_user }}
+      autologin-session={{ control_desktop_autologin_session }}
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Ensure the autologin user's ~/.config exists
+  ansible.builtin.file:
+    path: "/home/{{ control_desktop_autologin_user }}/.config"
+    state: directory
+    owner: "{{ control_desktop_autologin_user }}"
+    group: "{{ control_desktop_autologin_user }}"
+    mode: "0755"
+  when: control_desktop_disable_compositing | bool
+
+- name: Disable KDE compositing for the autologin user
+  ansible.builtin.ini_file:
+    path: "/home/{{ control_desktop_autologin_user }}/.config/kwinrc"
+    section: Compositing
+    option: Enabled
+    value: "false"
+    owner: "{{ control_desktop_autologin_user }}"
+    group: "{{ control_desktop_autologin_user }}"
+    mode: "0644"
+    create: true
+  when: control_desktop_disable_compositing | bool
+
+- name: Point the resolver at the internal DNS
+  when: control_desktop_manage_resolv | bool
+  block:
+    # Same path cloud-init (v2e-tf) already writes at first boot — converge it
+    # rather than adding a second drop-in with the same directive.
+    - name: Tell NetworkManager to leave resolv.conf alone
+      ansible.builtin.copy:
+        dest: /etc/NetworkManager/conf.d/90-dns-none.conf
+        content: |
+          # Managed by Ansible (control_desktop): resolv.conf is written statically.
+          [main]
+          dns=none
+        owner: root
+        group: root
+        mode: "0644"
+      register: control_desktop_nm_conf
+
+    # follow=false replaces the NetworkManager/systemd-resolved symlink with a
+    # real file instead of writing through it.
+    - name: Write a static resolv.conf (→ Technitium on infra)
+      ansible.builtin.copy:
+        dest: /etc/resolv.conf
+        follow: false
+        content: |
+          # Managed by Ansible (control_desktop). Internal DNS = Technitium (infra).
+          {% for ns in control_desktop_nameservers %}
+          nameserver {{ ns }}
+          {% endfor %}
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Reload NetworkManager (picks up dns=none; does not drop connections)
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: reloaded
+      when: control_desktop_nm_conf is changed
+      failed_when: false  # NM absent (headless rebuild without the desktop image) is fine
+
+- name: Manage the /etc/hosts shim block
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} v2e control_desktop"
+    block: |
+      {% for name, ip in control_desktop_hosts_entries.items() %}
+      {{ ip }} {{ name }}
+      {% endfor %}
+    state: "{{ (control_desktop_hosts_entries | length > 0) | ternary('present', 'absent') }}"

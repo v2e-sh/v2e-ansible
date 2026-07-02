@@ -12,5 +12,9 @@
   import_playbook: playbooks/02-services.yml
 - name: Applications phase (AI identities + workbench)
   import_playbook: playbooks/03-applications.yml
-- name: Infra phase (Docker runtime on the Technitium/RustDesk appliance node)
+- name: Infra phase (Docker + Technitium/RustDesk stacks + internal zone)
   import_playbook: playbooks/04-infra.yml
+- name: Tailnet phase (control subnet router + infra)
+  import_playbook: playbooks/05-tailscale.yml
+- name: Control desktop phase (autologin, resolver, RustDesk client)
+  import_playbook: playbooks/06-control-desktop.yml

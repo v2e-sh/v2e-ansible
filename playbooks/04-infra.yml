@@ -1,11 +1,7 @@
 ---
-# Phase 04 — infra appliance node: Docker runtime for the Technitium (DNS) + RustDesk
-# relay stacks (internal / Tailscale-only, deployed from v2e-compose like the services
-# node). This phase only readies the HOST with Docker. The DNS :53 handoff (disabling
-# the systemd-resolved stub so Technitium can bind the node's :53) and the stack deploy
-# are done deliberately in the infra_stack step, NOT here — a botched resolver switch
-# during an unattended first boot would break the node's own name resolution and fail
-# everything downstream.
+# Phase 04 — infra appliance node: Docker runtime, then the Technitium (DNS) +
+# RustDesk relay stacks (internal / Tailscale-only, deployed from v2e-compose like
+# the services node), then the internal zone content via the Technitium API.
 - name: Infra appliance node — Docker runtime (Technitium + RustDesk host)
   hosts: infra
   become: true
@@ -20,3 +16,62 @@
             max-size: "10m"
             max-file: "3"
           live-restore: true
+
+# The :53 handoff, ordered so a failure at any step leaves the node still able to
+# resolve: (1) pin /etc/resolv.conf to the upstream resolvers — from here on the
+# node's own resolution does NOT depend on the local stub; (2) free :53 by
+# disabling the systemd-resolved stub listener (when present); (3) deploy the
+# stacks (Technitium binds :53 host-net) and feed the zone.
+- name: Infra appliance node — free :53, deploy the DNS + relay stacks, feed the zone
+  hosts: infra
+  become: true
+  pre_tasks:
+    - name: Pin resolv.conf to the upstream resolvers (independent of the local stub)
+      ansible.builtin.copy:
+        dest: /etc/resolv.conf
+        follow: false
+        content: |
+          # Managed by Ansible (04-infra). The node resolves upstream directly —
+          # never through its own Technitium (a container restart must not take
+          # down the node's own name resolution).
+          {% for ns in infra_upstream_nameservers %}
+          nameserver {{ ns }}
+          {% endfor %}
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Check whether systemd-resolved exists on this image
+      ansible.builtin.stat:
+        path: /usr/lib/systemd/systemd-resolved
+      register: infra_resolved_bin
+
+    - name: Free :53 — disable the systemd-resolved stub listener
+      when: infra_resolved_bin.stat.exists
+      block:
+        - name: Ensure the resolved.conf.d drop-in directory exists
+          ansible.builtin.file:
+            path: /etc/systemd/resolved.conf.d
+            state: directory
+            mode: "0755"
+
+        - name: Disable the stub listener (Technitium owns this node's :53)
+          ansible.builtin.copy:
+            dest: /etc/systemd/resolved.conf.d/10-v2e-no-stub.conf
+            content: |
+              # Managed by Ansible (04-infra): Technitium owns this node's :53.
+              [Resolve]
+              DNSStubListener=no
+            owner: root
+            group: root
+            mode: "0644"
+          register: infra_resolved_stub
+
+        - name: Restart systemd-resolved to release :53
+          ansible.builtin.systemd:
+            name: systemd-resolved
+            state: restarted
+          when: infra_resolved_stub is changed
+  roles:
+    - compose_stack
+    - technitium_zone

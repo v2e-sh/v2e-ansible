@@ -1,0 +1,57 @@
+---
+# RustDesk needs an active X11 session to serve the desktop — the control_desktop
+# role provides lightdm autologin + plasmax11. The service runs as root; password
+# and options are set through the CLI in that root context (the hand-applied
+# procedure from the live bring-up).
+
+- name: Warn — rustdesk_client_version not pinned, skipping
+  ansible.builtin.debug:
+    msg: >-
+      rustdesk_client_version is empty — skipping the RustDesk client install.
+      Pin the exact release (and its .deb sha256) in group_vars/control.yml.
+  when: rustdesk_client_version | length == 0
+
+- name: Install + configure RustDesk
+  when: rustdesk_client_version | length > 0
+  block:
+    - name: Download the pinned RustDesk .deb
+      ansible.builtin.get_url:
+        url: "{{ rustdesk_client_deb_url }}"
+        dest: "/var/cache/rustdesk-{{ rustdesk_client_version }}.deb"
+        checksum: "{{ (rustdesk_client_deb_sha256 | length > 0)
+                      | ternary('sha256:' ~ rustdesk_client_deb_sha256, omit) }}"
+        mode: "0644"
+
+    - name: Install the RustDesk client
+      ansible.builtin.apt:
+        deb: "/var/cache/rustdesk-{{ rustdesk_client_version }}.deb"
+
+    - name: Enable + start the RustDesk service
+      ansible.builtin.systemd:
+        name: rustdesk
+        enabled: true
+        state: started
+
+    - name: Allow Direct-IP access (tailnet path — no rendezvous server)
+      ansible.builtin.command:
+        cmd: rustdesk --option direct-server Y
+      register: rustdesk_option
+      changed_when: false
+      failed_when: rustdesk_option.rc != 0
+      when: rustdesk_client_direct_ip_access | bool
+
+    - name: Set the unattended access password (from SOPS)
+      ansible.builtin.command:
+        cmd: rustdesk --password {{ rustdesk_unattended_password | quote }}
+      register: rustdesk_pw
+      changed_when: false
+      failed_when: rustdesk_pw.rc != 0
+      no_log: true
+      when: rustdesk_unattended_password | default('') | length > 0
+
+    - name: Warn — rustdesk_unattended_password not in SOPS
+      ansible.builtin.debug:
+        msg: >-
+          rustdesk_unattended_password is empty — unattended access is NOT set.
+          Add it to secrets.sops.yaml and re-run.
+      when: rustdesk_unattended_password | default('') | length == 0

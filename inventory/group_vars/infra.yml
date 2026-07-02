@@ -1,0 +1,43 @@
+---
+# Infra appliance node (Technitium DNS + RustDesk relay, Docker, mgmt VLAN).
+
+# SSH: cluster user + automation account (parity with services/agent).
+ssh_allow_users: "v2e ansible"
+
+# --- compose_stack (phase 04) ---
+compose_stack_repo_url: "https://github.com/v2e-sh/v2e-compose.git"
+compose_stack_dir: /opt/v2e-compose
+compose_stack_stacks:
+  - technitium
+  - rustdesk
+# Both stacks are host-network — no shared Traefik bridge on this node.
+compose_stack_network: ""
+# .env only needs DOMAIN (DNS_SERVER_DOMAIN=infra.int.${DOMAIN}) + the technitium
+# secrets here; the traefik/tinyauth pair is not required on this node.
+compose_stack_domain: "v2e.sh"
+compose_stack_required_secrets:
+  - technitium_admin_password
+
+# Upstream resolvers: the node's own resolv.conf (04-infra pins it — the node
+# never resolves through its own container) and Technitium's forwarders
+# (NAME_SERVERS in .env) use the same set.
+infra_upstream_nameservers:
+  - 1.1.1.1
+  - 9.9.9.9
+technitium_forwarders: "{{ infra_upstream_nameservers | join(', ') }}"
+
+# --- technitium_zone (phase 04) ---
+technitium_zone_name: "int.v2e.sh"
+# Wildcard + apex → the services node (Traefik terminates *.int.v2e.sh).
+technitium_zone_wildcard_target: 10.1.2.10
+# Per-node A records inside the zone (<label>.int.v2e.sh).
+technitium_zone_records:
+  infra: 10.1.0.10
+  control: 10.1.1.10
+  services: 10.1.2.10
+  agent: 10.1.3.10
+
+# --- tailscale (phase 05) ---
+# infra joins the tailnet plainly (no routes); reachable directly for DNS/relay.
+tailscale_node_ssh: true
+tailscale_node_advertise_routes: ""
