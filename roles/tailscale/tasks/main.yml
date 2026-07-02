@@ -54,4 +54,8 @@
       - OSMC
       - Linux Mint
       - Parrot
+    # Parrot's own major version ("7") trips upstream's `< 11` legacy-Debian
+    # gate, which tries the Python-2-era python-apt. Parrot is Debian 13-based:
+    # there are no legacy deps to install.
+    tailscale_legacy_apt_dependencies: []
   when: tailscale_authkey | default('') | length > 0
