@@ -9,6 +9,9 @@ compose_stack_stacks:
   - traefik
   - tinyauth
   - whoami
+  # COMPOSE-3 — ops tooling, both TinyAuth-gated (arcane replaces the planned dockge):
+  - semaphore
+  - arcane
 compose_stack_domain: "v2e.sh"
 compose_stack_acme_email: "admin@v2e.sh"
 compose_stack_cert_resolver: staging
