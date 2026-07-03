@@ -21,3 +21,22 @@ collections:
   # transitive devsec.hardening dep — pin it so it's explicit + Renovate-tracked.
   - name: ansible.posix
     version: "2.2.0"
+  # Modules imported directly by roles (ai_workbench: community.general.npm;
+  # ai_identities: community.general.sudoers). 13.x requires ansible-core >=2.18
+  # and is tested on 2.18–2.21 — inside the lab's >=2.19 <2.23 core range.
+  - name: community.general
+    version: "13.1.0"
+  # roles/ai_identities uses community.crypto.openssh_keypair. 3.x requires
+  # ansible-core >=2.17 — below the lab's 2.19 floor, so no core bump needed.
+  - name: community.crypto
+    version: "3.2.2"
+  # vyos.vyos.vyos_config (network_cli) drives roles/vyos_hardening_basic and
+  # roles/killswitch. 6.0.0 requires ansible-core >=2.15 and depends on
+  # ansible.netcommon >=2.5.1 (satisfied by the pin below).
+  - name: vyos.vyos
+    version: "6.0.0"
+  # Provides the network_cli connection (inventory sets ansible_connection=
+  # ansible.netcommon.network_cli) and is the vyos.vyos runtime dependency.
+  # 8.5.3 requires ansible-core >=2.16 and carries the 2.19–2.21 import fixes.
+  - name: ansible.netcommon
+    version: "8.5.3"
