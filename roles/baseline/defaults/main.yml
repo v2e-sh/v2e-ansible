@@ -2,6 +2,17 @@
 # Timezone applied to all managed nodes.
 baseline_timezone: "UTC"
 
+# Login passwords, set post-boot from SOPS instead of cloud-init chpasswd — so
+# they never sit plaintext in the Proxmox snippet or tfstate. Empty = leave that
+# account untouched (root stays locked; the admin user keeps whatever cloud-init
+# seeded, if anything). SSH entry is key-only regardless (ssh_pwauth off); these
+# passwords only gate console login and the admin user's sudo escalation.
+#   baseline_root_password        -> root (console/`su` rescue only)
+#   baseline_admin_login_password -> the human admin account (= its sudo password)
+baseline_root_password: ""
+baseline_admin_login_password: ""
+baseline_admin_user: "v2e"
+
 # systemd-journald disk cap (drop-in). Keeps logs from filling a small root disk.
 baseline_journald_max_use: "200M"
 

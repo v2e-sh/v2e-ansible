@@ -107,3 +107,21 @@
     name: unattended-upgrades
     enabled: true
     state: started
+
+# --- Login passwords from SOPS (not cloud-init) ---
+# Post-boot password seeding: keeps them out of the Proxmox snippet and tfstate.
+# password_hash with a per-host seeded salt so re-runs produce the same hash
+# (idempotent — no perpetual "changed"). Console/sudo only; SSH stays key-only.
+- name: Set root password (console/su rescue)
+  ansible.builtin.user:
+    name: root
+    password: "{{ baseline_root_password | password_hash('sha512', 65534 | random(seed=inventory_hostname) | string) }}"
+  no_log: true
+  when: baseline_root_password | length > 0
+
+- name: Set admin user login/sudo password
+  ansible.builtin.user:
+    name: "{{ baseline_admin_user }}"
+    password: "{{ baseline_admin_login_password | password_hash('sha512', 65534 | random(seed=inventory_hostname) | string) }}"
+  no_log: true
+  when: baseline_admin_login_password | length > 0
