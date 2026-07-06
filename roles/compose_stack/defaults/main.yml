@@ -5,6 +5,12 @@
 compose_stack_repo_url: ""
 compose_stack_repo_version: main
 compose_stack_dir: /opt/v2e-compose
+# Authelia's rendered secrets (RS256 issuer key inlined in configuration.yml + the
+# admin hash in users_database.yml) live OUTSIDE compose_stack_dir on purpose: the
+# Arcane container bind-mounts the whole compose_stack_dir tree and starts as root,
+# so keeping the IdP key material out of that tree is what stops Arcane from reading
+# it. Must match the absolute mount path in v2e-compose/authelia/compose.yml.
+authelia_secrets_dir: /opt/authelia-secrets
 compose_stack_stacks:
   - traefik
   - authelia

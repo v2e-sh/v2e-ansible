@@ -41,14 +41,20 @@
 # Source-tree permissions BEFORE the first `compose up`: images running as non-root
 # uids (grafana 472, loki 10001, prometheus 65534) must be able to read their
 # bind-mounted configs at first start, or they crash-loop until a later chmod +
-# restart-backoff happens to line up. Everything in the tree is public git content;
-# the secrets live only in .env (rendered below with its own tight mode) and in
-# runtime data dirs (excluded — traefik's acme.json must stay 0600).
+# restart-backoff happens to line up. EXCLUDED from the world-readable (o+rX) widening:
+# runtime data dirs (*/data — traefik's acme.json must stay 0600) and the rendered .env
+# (all scoped SOPS secrets, re-rendered 0640 just below). Without the .env prune a
+# re-converge briefly world-read the secrets — and permanently if a later task aborted
+# mid-play. The Authelia RS256 key + hashes are rendered OUTSIDE this tree entirely
+# (authelia_secrets_dir), so the sweep never touches them.
 - name: Make the stack tree readable (operator rw via docker group; non-root images o+rX)
   ansible.builtin.shell:
     cmd: >-
       chgrp -R docker {{ compose_stack_dir | quote }} &&
-      find {{ compose_stack_dir | quote }} -path '*/data' -prune -o -exec chmod g+rwX,o+rX {} +
+      find {{ compose_stack_dir | quote }}
+      -path '*/data' -prune -o
+      -name '.env' -prune -o
+      -exec chmod g+rwX,o+rX {} +
   changed_when: false
 
 - name: Create the shared external frontend network
@@ -71,14 +77,15 @@
 
 # Authelia needs two secrets that can't be env-file values: the multiline RS256 issuer
 # key and the users_database (which carries the admin argon2 hash). Render both from SOPS
-# into the gitignored authelia/config/secrets/ dir (0600) so no credential hash lands in
-# git. Only runs on a host that deploys the authelia stack.
+# into authelia_secrets_dir — a 0750 dir OUTSIDE compose_stack_dir, so the Arcane container
+# (which bind-mounts the whole compose tree and starts as root) can never reach the IdP
+# signing key. The authelia stack mounts them by absolute path. Only runs where authelia deploys.
 - name: Provision Authelia out-of-band secrets (issuer key + users db) from SOPS
   when: "'authelia' in compose_stack_stacks"
   block:
-    - name: Ensure the Authelia secrets dir exists (0700)
+    - name: Ensure the Authelia secrets dir exists (0750, outside the compose tree)
       ansible.builtin.file:
-        path: "{{ compose_stack_dir }}/authelia/config/secrets"
+        path: "{{ authelia_secrets_dir }}"
         state: directory
         owner: root
         group: docker
@@ -87,7 +94,7 @@
     - name: Render configuration.yml with the inlined RS256 issuer key (0640)
       ansible.builtin.template:
         src: authelia-configuration.yml.j2
-        dest: "{{ compose_stack_dir }}/authelia/config/secrets/configuration.yml"
+        dest: "{{ authelia_secrets_dir }}/configuration.yml"
         owner: root
         group: docker
         mode: "0640"
@@ -95,7 +102,7 @@
 
     - name: Render the Authelia users database (admin argon2 hash from SOPS, 0640)
       ansible.builtin.copy:
-        dest: "{{ compose_stack_dir }}/authelia/config/secrets/users_database.yml"
+        dest: "{{ authelia_secrets_dir }}/users_database.yml"
         owner: root
         group: docker
         mode: "0640"
@@ -112,6 +119,14 @@
                 - 'arcane-admins'
                 - 'grafana-admins'
       no_log: true
+
+    # Defense in depth: guarantee the IdP key material never lingers inside the compose
+    # tree that Arcane mounts. Removes the legacy in-tree render location; no-op on a
+    # fresh clone (the dir is gitignored and only the old render created it).
+    - name: Remove any legacy in-tree Authelia secrets (relocated out of the compose tree)
+      ansible.builtin.file:
+        path: "{{ compose_stack_dir }}/authelia/config/secrets"
+        state: absent
 
 - name: Deploy each compose stack
   community.docker.docker_compose_v2:
