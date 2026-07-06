@@ -84,10 +84,10 @@
         group: docker
         mode: "0750"
 
-    - name: Render the OIDC issuer private key (RS256 PEM, 0640)
-      ansible.builtin.copy:
-        content: "{{ authelia_oidc_issuer_key }}"
-        dest: "{{ compose_stack_dir }}/authelia/config/secrets/oidc.issuer.pem"
+    - name: Render configuration.yml with the inlined RS256 issuer key (0640)
+      ansible.builtin.template:
+        src: "{{ compose_stack_dir }}/authelia/config/configuration.yml.j2"
+        dest: "{{ compose_stack_dir }}/authelia/config/secrets/configuration.yml"
         owner: root
         group: docker
         mode: "0640"
