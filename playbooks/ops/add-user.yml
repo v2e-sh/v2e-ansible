@@ -1,0 +1,42 @@
+---
+# On-demand: add a login user to chosen node(s). Survey-driven from Semaphore, or:
+#   ansible-playbook playbooks/ops/add-user.yml -e target=services \
+#     -e username=alice -e "ssh_public_key='ssh-ed25519 AAAA... alice'" -e grant_sudo=false
+# Key-only (no passwords). Idempotent.
+
+- name: Add a login user
+  hosts: "{{ target | default('none') }}"
+  become: true
+  gather_facts: false
+  vars:
+    grant_sudo: false
+    login_shell: /bin/bash
+  tasks:
+    - name: Require username + ssh_public_key + a real target
+      ansible.builtin.assert:
+        that:
+          - target != 'none'
+          - username is defined and username | length > 0
+          - ssh_public_key is defined and ssh_public_key | length > 0
+        fail_msg: "Pass -e target=<host|group>, -e username=..., -e ssh_public_key='...'"
+
+    - name: Create the user
+      ansible.builtin.user:
+        name: "{{ username }}"
+        shell: "{{ login_shell }}"
+        create_home: true
+        state: present
+
+    - name: Install the authorized key
+      ansible.posix.authorized_key:
+        user: "{{ username }}"
+        key: "{{ ssh_public_key }}"
+        state: present
+
+    - name: Manage passwordless sudo per grant_sudo (add or revoke on re-run)
+      community.general.sudoers:
+        name: "10-{{ username }}"
+        user: "{{ username }}"
+        commands: ALL
+        nopassword: true
+        state: "{{ 'present' if (grant_sudo | bool) else 'absent' }}"

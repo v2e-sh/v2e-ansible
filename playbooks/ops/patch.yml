@@ -4,10 +4,16 @@
 #   ansible-playbook playbooks/ops/patch.yml --tags patch --limit services
 # Reboots only nodes that need it, never the controller (see roles/patch).
 
-- name: Orchestrated full patch
-  hosts: linux
+- name: Orchestrated full patch (one node at a time)
+  hosts: "{{ target | default('linux') }}"
   become: true
+  serial: 1                      # patch + reboot a single node, then move on
+  max_fail_percentage: 0         # stop the whole run if any node fails to come back
   tags:
     - patch
   roles:
     - patch
+  post_tasks:
+    - name: Confirm the node is back and reachable after patch/reboot
+      ansible.builtin.wait_for_connection:
+        timeout: 120
