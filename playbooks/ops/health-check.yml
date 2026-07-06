@@ -1,0 +1,30 @@
+---
+# On-demand read-only health report across chosen node(s). Changes nothing.
+#   ansible-playbook playbooks/ops/health-check.yml -e target=all
+# Reports: reachability, disk %, memory %, and (on Docker hosts) unhealthy containers.
+
+- name: Estate health report (read-only)
+  hosts: "{{ target | default('linux') }}"
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Disk + memory snapshot
+      ansible.builtin.set_fact:
+        _disk_pct: "{{ (ansible_mounts | selectattr('mount', 'eq', '/') | map(attribute='size_available') | first | float
+                        / (ansible_mounts | selectattr('mount', 'eq', '/') | map(attribute='size_total') | first | float) * 100) | round(1) }}"
+        _mem_pct: "{{ (ansible_memory_mb.real.available | float / ansible_memory_mb.real.total | float * 100) | round(1) }}"
+
+    - name: Check for unhealthy Docker containers (Docker hosts only)
+      ansible.builtin.command:
+        cmd: docker ps --filter health=unhealthy --format '{{ "{{" }}.Names{{ "}}" }}'
+      register: _unhealthy
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Report
+      ansible.builtin.debug:
+        msg:
+          - "host={{ inventory_hostname }} reachable=yes"
+          - "disk_free_pct={{ _disk_pct }} mem_avail_pct={{ _mem_pct }}"
+          - "unhealthy_containers={{ _unhealthy.stdout_lines | default([]) | join(',') or 'none' }}"
