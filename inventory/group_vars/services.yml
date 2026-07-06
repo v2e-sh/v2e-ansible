@@ -18,6 +18,9 @@ compose_stack_required_secrets:
   - authelia_admin_password_hash              # argon2id -> config/secrets/users_database.yml
   - authelia_oidc_arcane_client_secret_hash   # pbkdf2 (Authelia side)
   - authelia_oidc_grafana_client_secret_hash  # pbkdf2 (Authelia side)
+  # SSO-2 app migration: plaintext client secrets for the RP apps (.env, D3-scoped):
+  - authelia_oidc_arcane_client_secret        # plaintext (Arcane OIDC_CLIENT_SECRET)
+  - authelia_oidc_grafana_client_secret       # plaintext (Grafana GENERIC_OAUTH secret)
 compose_stack_stacks:
   - traefik
   - tinyauth        # kept until every app is repointed to authelia@docker / OIDC
