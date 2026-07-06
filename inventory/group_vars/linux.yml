@@ -14,3 +14,10 @@ sysctl_overwrite:
 # Match the retired role's SSH keepalive intent (interval 300 / count 2). devsec's
 # ssh_client_alive_interval already defaults to 300; count defaults to 3, so pin 2.
 ssh_client_alive_count: 2
+
+# --- baseline: post-boot login passwords (SOPS-sourced) ---
+# Values come from secrets.sops.yaml (root_password, sudo_password) via the
+# group_vars/all.sops.yaml + `-e @~/.v2e-secrets.yml` delivery paths. Blank/absent
+# = account untouched, so the play never fails when the keys aren't shipped yet.
+baseline_root_password: "{{ root_password | default('') }}"
+baseline_admin_login_password: "{{ sudo_password | default('') }}"
