@@ -86,7 +86,7 @@
 
     - name: Render configuration.yml with the inlined RS256 issuer key (0640)
       ansible.builtin.template:
-        src: "{{ compose_stack_dir }}/authelia/config/configuration.yml.j2"
+        src: authelia-configuration.yml.j2
         dest: "{{ compose_stack_dir }}/authelia/config/secrets/configuration.yml"
         owner: root
         group: docker
