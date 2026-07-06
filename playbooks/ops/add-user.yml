@@ -33,11 +33,10 @@
         key: "{{ ssh_public_key }}"
         state: present
 
-    - name: Grant passwordless sudo (only when requested)
+    - name: Manage passwordless sudo per grant_sudo (add or revoke on re-run)
       community.general.sudoers:
         name: "10-{{ username }}"
         user: "{{ username }}"
         commands: ALL
         nopassword: true
-        state: present
-      when: grant_sudo | bool
+        state: "{{ 'present' if (grant_sudo | bool) else 'absent' }}"
