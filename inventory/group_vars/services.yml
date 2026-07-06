@@ -20,15 +20,18 @@ compose_stack_required_secrets:
   # SSO-2 app migration: plaintext client secrets for the RP apps (.env, D3-scoped):
   - authelia_oidc_arcane_client_secret        # plaintext (Arcane OIDC_CLIENT_SECRET)
   - authelia_oidc_grafana_client_secret       # plaintext (Grafana GENERIC_OAUTH secret)
+  - vaultwarden_admin_token                   # Vaultwarden /admin panel token
 compose_stack_stacks:
   - traefik
   - authelia        # SSO: forward-auth (authelia@docker) + OIDC provider
   - whoami
-  # COMPOSE-3 — ops tooling, both TinyAuth-gated (arcane replaces the planned dockge):
+  # COMPOSE-3 — ops tooling (Authelia-gated; arcane replaces the planned dockge):
   - semaphore
   - arcane
   # Phase G — observability (grafana + uptime-kuma gated; rest internal):
   - observability
+  # Password vault — app open (own master-password auth), /admin Authelia-gated:
+  - vaultwarden
 compose_stack_domain: "v2e.sh"
 compose_stack_internal_domain: "int.v2e.sh"
 compose_stack_acme_email: "admin@v2e.sh"
