@@ -8,10 +8,20 @@ compose_stack_dir: /opt/v2e-compose
 # Fail-fast before deploy: the traefik (DNS-01) + tinyauth secrets must be present.
 compose_stack_required_secrets:
   - cf_dns_api_token
-  - tinyauth_auth_users
+  - tinyauth_auth_users            # keep until every app is migrated off tinyauth
+  # SSO-1 Authelia (deployed alongside tinyauth during migration):
+  - authelia_session_secret
+  - authelia_storage_encryption_key
+  - authelia_reset_password_jwt_secret
+  - authelia_oidc_hmac_secret
+  - authelia_oidc_issuer_key                  # RS256 PEM -> config/secrets/oidc.issuer.pem
+  - authelia_admin_password_hash              # argon2id -> config/secrets/users_database.yml
+  - authelia_oidc_arcane_client_secret_hash   # pbkdf2 (Authelia side)
+  - authelia_oidc_grafana_client_secret_hash  # pbkdf2 (Authelia side)
 compose_stack_stacks:
   - traefik
-  - tinyauth
+  - tinyauth        # kept until every app is repointed to authelia@docker / OIDC
+  - authelia        # SSO-1: forward-auth + OIDC provider (runs alongside tinyauth)
   - whoami
   # COMPOSE-3 — ops tooling, both TinyAuth-gated (arcane replaces the planned dockge):
   - semaphore
