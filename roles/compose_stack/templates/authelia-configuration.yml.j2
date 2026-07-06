@@ -3,8 +3,14 @@
 # they are injected via AUTHELIA_* env overrides from the SOPS-rendered ../.env (Authelia
 # refuses to start if the same secret is set in both env and YAML). Each omission is marked.
 
+# v2e branding: dark theme (matches the brand's near-black + violet palette) and a
+# custom asset path serving the hexagon logo.png + favicon.ico on the login portal.
+theme: 'dark'
+
 server:
   address: 'tcp://:9091/'
+  # Custom login-portal assets (logo.png + favicon.ico), mounted from ./assets.
+  asset_path: '/config/assets'
   # Leave the built-in healthcheck active (homelab, not a restrictive K8s env).
   disable_healthcheck: false
 
