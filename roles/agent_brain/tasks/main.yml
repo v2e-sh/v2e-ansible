@@ -160,6 +160,11 @@
     'superpowers' not in agent_brain_superpowers_plugins.stdout
   environment:
     HOME: "/home/{{ agent_brain_user }}"
+  # BEST-EFFORT: `claude plugin` needs claude authenticated (rc=13 without a key/login),
+  # which is a one-time manual secret (vault_anthropic_api_key in SOPS, or `claude login`).
+  # Don't let an unauthenticated node block the rest of the brain deploy (vault, guard,
+  # timers) — this surfaces the miss but doesn't halt. Re-run once auth is in place.
+  ignore_errors: true
 
 - name: Install the Context7 marketplace and Claude plugin
   become: true
@@ -188,6 +193,8 @@
   environment:
     HOME: "/home/{{ agent_brain_user }}"
   when: agent_brain_context7_enabled | bool
+  # Best-effort: needs claude authenticated (see the Superpowers verify note).
+  ignore_errors: true
 
 - name: Ensure private Context7 environment directory exists
   ansible.builtin.file:
@@ -241,6 +248,7 @@
     PIPX_HOME: "/home/{{ agent_brain_user }}/.local/pipx"
     PIPX_BIN_DIR: "/home/{{ agent_brain_user }}/.local/bin"
   changed_when: true
+  failed_when: false  # optional third-party tool — never block the brain deploy
   when:
     - agent_brain_graphify_enabled | bool
     - >-
@@ -259,6 +267,7 @@
     PIPX_HOME: "/home/{{ agent_brain_user }}/.local/pipx"
     PIPX_BIN_DIR: "/home/{{ agent_brain_user }}/.local/bin"
   changed_when: false
+  failed_when: false  # optional third-party tool — never block the brain deploy
   when: agent_brain_graphify_enabled | bool
 
 # Graphify and Context7 are OPTIONAL accelerators (operator decision: demote from
