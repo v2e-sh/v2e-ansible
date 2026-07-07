@@ -56,6 +56,10 @@
   ansible.builtin.shell: |
     set -euo pipefail
     root=$(npm root -g)
+    # npm installed the global tree with a restrictive umask (dirs 750 root:root), so the
+    # non-root AI accounts could not traverse to the CLI binaries. Make it world-traversable
+    # (o+rX = read files / enter dirs only) so `claude`/`codex` resolve for every account.
+    chmod -R o+rX "$root" 2>/dev/null || true
     changed=0
     for spec in "@anthropic-ai/claude-code:claude" "@openai/codex:codex"; do
       pkg=${spec%%:*}; name=${spec##*:}
@@ -117,6 +121,28 @@
     mode: "0600"
   loop: "{{ ai_workbench_anthropic_accounts }}"
   when: ai_workbench_anthropic_api_key | length > 0
+  no_log: true
+
+# --- Claude OAuth token (subscription auth; used when no API key is set) ---
+- name: Ensure the agent-run config dir per account (OAuth)
+  ansible.builtin.file:
+    path: "/home/{{ item }}/.config/agent-run"
+    state: directory
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0700"
+  loop: "{{ ai_workbench_anthropic_accounts }}"
+  when: ai_workbench_anthropic_oauth_token | length > 0
+
+- name: Write the CLAUDE_CODE_OAUTH_TOKEN env per account
+  ansible.builtin.copy:
+    content: "CLAUDE_CODE_OAUTH_TOKEN={{ ai_workbench_anthropic_oauth_token }}\n"
+    dest: "/home/{{ item }}/.config/agent-run/env"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0600"
+  loop: "{{ ai_workbench_anthropic_accounts }}"
+  when: ai_workbench_anthropic_oauth_token | length > 0
   no_log: true
 
 # --- agent-run wrapper (system-wide) ---
