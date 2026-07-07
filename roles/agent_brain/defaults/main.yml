@@ -1,0 +1,57 @@
+---
+# Agent memory/tooling checkout. Two GitHub host aliases are used because a
+# deploy key is repository-scoped and cannot be reused safely across repos.
+agent_brain_user: claude
+agent_brain_group: claude
+agent_brain_dir: /opt/agents
+agent_brain_public_repo: git@github-agents-public:v2e-sh/v2e-agents.git
+agent_brain_private_repo: git@github-agents-private:v2e-sh/agents-pers.git
+agent_brain_repo_version: main
+agent_brain_pull_interval: "*:0/30"
+
+# Weekly reflective pass: a headless agent consolidates memory (merge duplicates,
+# fix stale facts, prune the INDEX — NEVER hard-deletes; delete = PR) and then the
+# eval ratchet reports hit@1/hit@3 so a regression is visible. Both run through the
+# ai_workbench `agent-run` wrapper / the `vault` CLI on the agent host. The command
+# strings are variableised so adjusting the prompt or eval flags is a one-liner.
+agent_brain_consolidate_interval: "Sun *-*-* 04:00:00"
+agent_brain_consolidate_timeout_sec: 1800
+# NOTE: these command strings are embedded in a single-quoted `sh -c '...'` in the
+# systemd unit, so the inner prompt uses DOUBLE quotes (single quotes cannot nest)
+# and avoids $ / backticks (which would trigger expansion inside double quotes).
+agent_brain_consolidate_command: >-
+  agent-run claude "Use the consolidate-memory skill to run one reflective pass over
+  the vault: merge duplicate notes, fix stale facts, flip superseded notes to the
+  retired lifecycle status, and rebuild the INDEX. Do NOT hard-delete anything
+  (deletion is a human-gated PR). Only auto-write after vault check --require passes."
+agent_brain_eval_command: "vault eval"
+
+# Populate these through SOPS. Register the matching public keys separately on
+# each GitHub repository; enable write access only where agent pushes are wanted.
+agent_brain_public_deploy_key: "{{ vault_agent_brain_public_deploy_key | default('') }}"
+agent_brain_private_deploy_key: "{{ vault_agent_brain_private_deploy_key | default('') }}"
+# The site play activates automatically once both SOPS values exist. The
+# standalone playbook can still be invoked with -e agent_brain_enabled=true to
+# get the role's explicit missing-key assertion during initial setup.
+agent_brain_enabled: >-
+  {{ (agent_brain_public_deploy_key | trim | length > 0)
+     and (agent_brain_private_deploy_key | trim | length > 0) }}
+
+agent_brain_superpowers_marketplace: obra/superpowers-marketplace
+agent_brain_superpowers_plugin: superpowers@superpowers-marketplace
+
+# Graphify is an OPTIONAL accelerator (operator decision: demoted from mandatory). It
+# is a derived local index that never replaces the Markdown vault or indexes nested
+# private memory, and its absence must never block work (governance: fall back to
+# grep/targeted reads). Set false to skip installing it entirely.
+agent_brain_graphify_enabled: true
+agent_brain_graphify_version: "0.9.8"
+agent_brain_graphify_package: "graphifyy[terraform]=={{ agent_brain_graphify_version }}"
+agent_brain_graphify_disable_query_log: true
+
+# Context7's Claude plugin bundles MCP tools, an auto-triggering skill, a focused
+# docs agent, and a manual command. Anonymous access works at lower rate limits.
+agent_brain_context7_enabled: true
+agent_brain_context7_marketplace: upstash/context7
+agent_brain_context7_plugin: context7@context7-marketplace
+agent_brain_context7_api_key: "{{ vault_context7_api_key | default('') }}"

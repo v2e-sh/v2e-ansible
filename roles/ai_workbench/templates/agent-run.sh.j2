@@ -1,22 +1,67 @@
 #!/usr/bin/env bash
 # Run an AI agent headless (one-shot). Usage: agent-run <claude|codex> <prompt...>
 # Sources the calling account's env (e.g. ANTHROPIC_API_KEY) when present, then
-# execs the chosen tool in non-interactive mode. Installed by the ai-workbench role.
+# runs the chosen tool in non-interactive mode. Installed by the ai-workbench role.
+#
+# claude path: tries an ORDERED model list (AGENT_RUN_MODELS) with retry + backoff,
+# so a single unavailable/overloaded model does not fail the whole run. It logs which
+# model served to stderr and falls back to the next model on failure. Set
+# AGENT_RUN_MODELS to override the order; AGENT_RUN_RETRIES / AGENT_RUN_BACKOFF tune
+# the per-model retry loop.
 set -euo pipefail
 
 tool="${1:-}"
 shift || true
 prompt="$*"
 
-env_file="$HOME/.config/agent-run/env"
-if [ -f "$env_file" ]; then
-  set -a
-  . "$env_file"
-  set +a
-fi
+for env_file in \
+  "$HOME/.config/agent-run/env" \
+  "$HOME/.config/agent-brain/context7.env"; do
+  if [ -f "$env_file" ]; then
+    set -a
+    . "$env_file"
+    set +a
+  fi
+done
+unset env_file
+
+# Ordered model fallback list + retry tuning (overridable via env / the env-files).
+AGENT_RUN_MODELS="${AGENT_RUN_MODELS:-claude-opus-4-8 claude-sonnet-5 claude-haiku-4-5}"
+AGENT_RUN_RETRIES="${AGENT_RUN_RETRIES:-2}"
+AGENT_RUN_BACKOFF="${AGENT_RUN_BACKOFF:-5}"
+
+log() { printf 'agent-run: %s\n' "$*" >&2; }
+
+run_claude() {
+  # Walk the ordered model list; retry each model with linear backoff before
+  # falling back to the next. Returns the exit status of the first model that
+  # serves the request, or the last failure if every model is exhausted.
+  local model attempt delay rc=1
+  for model in $AGENT_RUN_MODELS; do
+    attempt=1
+    while [ "$attempt" -le "$AGENT_RUN_RETRIES" ]; do
+      log "trying model=$model (attempt $attempt/$AGENT_RUN_RETRIES)"
+      # `|| rc=$?` keeps errexit from aborting on a failed attempt and captures the
+      # real exit status (a bare `if` would swallow it as 0).
+      rc=0
+      claude --model "$model" -p "$prompt" || rc=$?
+      if [ "$rc" -eq 0 ]; then
+        log "served by model=$model"
+        return 0
+      fi
+      delay=$(( AGENT_RUN_BACKOFF * attempt ))
+      log "model=$model failed (rc=$rc); backing off ${delay}s"
+      sleep "$delay"
+      attempt=$(( attempt + 1 ))
+    done
+    log "model=$model exhausted; falling back to next model"
+  done
+  log "all models exhausted: $AGENT_RUN_MODELS"
+  return "$rc"
+}
 
 case "$tool" in
-  claude) exec claude -p "$prompt" ;;
+  claude) run_claude ;;
   codex)  exec codex exec "$prompt" ;;
   *) echo "usage: agent-run <claude|codex> <prompt>" >&2; exit 2 ;;
 esac

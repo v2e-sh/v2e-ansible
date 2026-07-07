@@ -1,0 +1,46 @@
+---
+# Phase 07 — clone and wire the governed agent team after identities/tooling exist.
+#
+# AB-1 loud-fail: this phase must NEVER silently no-op on the agent host. Before the
+# role's own key assertion runs, decide OUT LOUD whether the brain is being deployed:
+#   * keys present            -> deploy (role runs, asserts again defensively).
+#   * keys ABSENT             -> a missing-key run FAILS VISIBLY here, on the agent
+#                                host, instead of skipping in silence.
+#   * auto-enable in site.yml -> the skip is still announced LOUDLY (debug), so an
+#                                unattended first boot leaves a trail explaining why
+#                                the brain was not provisioned.
+- name: Provision the agent brain on node 313
+  hosts: agent
+  become: true
+  vars:
+    # True only when BOTH deploy keys resolve to non-empty material.
+    agent_brain_keys_present: >-
+      {{ (agent_brain_public_deploy_key | trim | length > 0)
+         and (agent_brain_private_deploy_key | trim | length > 0) }}
+  pre_tasks:
+    - name: Announce the agent-brain deploy decision
+      ansible.builtin.debug:
+        msg: >-
+          agent-brain phase 07 on {{ inventory_hostname }}:
+          keys_present={{ agent_brain_keys_present | bool }},
+          enabled={{ agent_brain_enabled | bool }}.
+          {{ 'Deploying.' if agent_brain_keys_present | bool
+             else 'SKIPPING — deploy keys absent from SOPS (this is expected only on a '
+                  ~ 'pre-key first boot; register both keys and re-run to provision).' }}
+
+    - name: Fail loudly when the agent brain is requested without deploy keys
+      ansible.builtin.assert:
+        that:
+          - agent_brain_keys_present | bool
+        fail_msg: >-
+          agent-brain was requested (agent_brain_enabled=true) on
+          {{ inventory_hostname }} but one or both GitHub deploy keys are missing
+          from SOPS. Phase 07 refuses to no-op silently: register the public/private
+          deploy keys (see roles/agent_brain/README.md) and re-run. To intentionally
+          skip on a pre-key first boot, leave agent_brain_enabled unset/false.
+        success_msg: "agent-brain deploy keys present — provisioning the brain."
+        quiet: true
+      when: agent_brain_enabled | bool
+  roles:
+    - role: agent_brain
+      when: agent_brain_enabled | bool

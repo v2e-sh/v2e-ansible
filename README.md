@@ -62,6 +62,7 @@ site.yml                           # thin orchestrator — imports the three pha
 playbooks/01-bootstrap.yml         # smoke test + health_check + baseline + deb hardening
 playbooks/02-services.yml          # Docker CE + Compose on services node
 playbooks/03-applications.yml      # AI-agent identities + workbench on agent node
+playbooks/07-agent-brain.yml       # public/private vault, guard, optional code graph
 playbooks/ops/killswitch.yml       # VyOS cut/allow/cut-hard for the agent subnet (tag-gated)
 playbooks/ops/patch.yml            # on-demand full dist-upgrade + reboot-if-required
 playbooks/ops/vyos-hardening.yml   # VyOS router hardening (network_cli, operator-run)
@@ -74,6 +75,7 @@ roles/health_check/                # fail-fast reachability + sanity assertions
 roles/patch/                       # on-demand full patch (ansible.builtin only)
 roles/ai_identities/               # per-AI Unix accounts + SSH mesh + NOPASSWD sudo
 roles/ai_workbench/                # Node.js, Claude Code, Codex, superpowers, agent-run
+roles/agent_brain/                 # agents repos, vault CLI, Graphify, refresh timer
 roles/vyos_hardening_basic/        # VyOS key-only SSH + syslog + commit-confirm hardening
 roles/docker/                      # vendored geerlingguy.docker (replaced wholesale in ANS-3)
 roles/killswitch/                  # VyOS cut/allow/cut-hard for the agent subnet
