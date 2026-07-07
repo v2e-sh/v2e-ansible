@@ -1,0 +1,19 @@
+---
+# Temporary forward-filter accept: agent_subnet -> control_ip:22/tcp. Forward
+# chain ONLY — never touches the input chain, so the network_cli path Ansible
+# rides (control -> router input) is never severed by this role. Rule number
+# 111 sits ABOVE the killswitch reserve (100-110) — see preflight.yml and the
+# README composition note: VyOS matches lowest-number-first, so the
+# killswitch's drop at 110 always wins over this accept when both are active.
+
+- name: Agent access — open the forward-filter rule (agent -> control:22)
+  vyos.vyos.vyos_config:
+    lines:
+      - "set firewall ipv4 forward filter rule {{ agent_access_rule }} description 'AGENT-ACCESS TEMP agent -> control ssh'"
+      - "set firewall ipv4 forward filter rule {{ agent_access_rule }} action accept"
+      - "set firewall ipv4 forward filter rule {{ agent_access_rule }} source address {{ agent_access_agent_subnet }}"
+      - "set firewall ipv4 forward filter rule {{ agent_access_rule }} destination address {{ agent_access_control_ip }}"
+      - "set firewall ipv4 forward filter rule {{ agent_access_rule }} destination port '22'"
+      - "set firewall ipv4 forward filter rule {{ agent_access_rule }} protocol 'tcp'"
+    comment: "ansible agent_access open (rule)"
+    save: "{{ agent_access_save }}"

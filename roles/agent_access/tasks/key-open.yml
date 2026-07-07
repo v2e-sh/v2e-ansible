@@ -1,0 +1,13 @@
+---
+# Authorize the agent's pubkey on control's landing account. Reuses the
+# agent_access_pubkey fact preflight.yml already slurped + decoded from the hub
+# (main.yml guarantees preflight runs first on OPEN) rather than reading it a
+# second time. This role never generates key material — see README
+# Prerequisites.
+
+- name: Agent access — authorize the agent's key on the landing account
+  ansible.posix.authorized_key:
+    user: "{{ agent_access_landing_account }}"
+    key: "{{ agent_access_pubkey }}"
+    exclusive: false
+    state: present

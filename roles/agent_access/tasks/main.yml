@@ -1,0 +1,27 @@
+---
+# Dispatch on agent_access_state + agent_access_half. Driven by agent-access.yml's
+# tags; each of its 5 plays forces both vars itself, so there is nothing to
+# fat-finger. preflight.yml runs ahead of the rule/key halves on OPEN only — close
+# has no preflight, by design (it must work even in a degraded/cut state).
+
+- name: Validate agent_access_state
+  ansible.builtin.assert:
+    that: agent_access_state in ['open', 'close']
+    fail_msg: "agent_access_state must be one of: open, close"
+
+- name: Validate agent_access_half
+  ansible.builtin.assert:
+    that: agent_access_half in ['rule', 'key', 'verify']
+    fail_msg: "agent_access_half must be one of: rule, key, verify"
+
+- name: Preflight checks (open only)
+  ansible.builtin.include_tasks: preflight.yml
+  when: agent_access_state == 'open' and agent_access_half in ['rule', 'key']
+
+- name: "Agent access — run the half+state task file: {{ [agent_access_half, agent_access_state] | join('-') }}"
+  ansible.builtin.include_tasks: "{{ agent_access_half }}-{{ agent_access_state }}.yml"
+  when: agent_access_half in ['rule', 'key']
+
+- name: Agent access — verify open
+  ansible.builtin.include_tasks: verify-open.yml
+  when: agent_access_half == 'verify'

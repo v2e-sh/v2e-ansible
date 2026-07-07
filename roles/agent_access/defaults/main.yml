@@ -1,0 +1,55 @@
+---
+# Operator switch that opens/closes the AI agent's jump-host reach (agent VLAN ->
+# control:22) for a bounded production-readiness test window. Modeled on
+# roles/killswitch: additive + removable, tagged, never-guard. Driven by
+# agent-access.yml's 5 plays, which force state+half themselves — do not
+# override these two with -e.
+
+# open | close. Forced by agent-access.yml's plays — never set directly.
+agent_access_state: close
+
+# rule | key | verify. Forced by agent-access.yml's plays — never set directly.
+agent_access_half: rule
+
+# --- rule half: VyOS forward-filter accept, agent_subnet -> control_ip:22/tcp ---
+agent_access_agent_subnet: "10.1.3.0/24"
+agent_access_control_ip: "10.1.1.10"
+
+# Forward-filter rule number for the temporary accept. MUST sit ABOVE the
+# killswitch reserve (killswitch_rule_base=100 .. +10=110): VyOS matches
+# lowest-number-first, so the killswitch's drop at 110 must win over this accept
+# whenever both are active — a lower-numbered allow would silently punch through
+# a higher-numbered drop. 111 also clears the v2e-tf cloud-init baseline (10, 20,
+# 21, 25, 26, 27, 30-35). preflight.yml hard-fails if this collides with either.
+agent_access_rule: 111
+agent_access_killswitch_reserve_start: 100
+agent_access_killswitch_reserve_end: 110
+agent_access_baseline_rules: [10, 20, 21, 25, 26, 27, 30, 31, 32, 33, 34, 35]
+
+# Persist the rule to config.boot. Keep FALSE: a router reboot then self-heals
+# back to the closed Terraform cloud-init baseline. true is a footgun — it
+# persists the accept AND Terraform won't remove it (see README).
+agent_access_save: false
+
+# --- key half: authorize/deauthorize on control's landing account ---
+# Landing account on control. Option A (chosen): v2e — already in
+# ssh_allow_users. Its control-side key also reaches VyOS; see README for the
+# out-of-band-killswitch requirement this implies during any open window.
+agent_access_landing_account: v2e
+
+# Hub host that holds each AI account's private key (mirrors
+# ai_identities_hub_host). Only read from at open time; close never touches it.
+agent_access_hub_host: "{{ groups['agent'][0] }}"
+
+# Which AI account's key to authorize on open (must already exist — see
+# roles/ai_identities). Not consulted on close: close strips every agent key.
+agent_access_ai_account: claude
+
+# --- verify half: post-open TCP reachability, from control ---
+agent_access_services_ip: "10.1.2.10"
+agent_access_vyos_ip: "10.1.1.1"
+
+# Hard-gate: an OPEN run that can't confirm TCP reachability to services:22 and
+# vyos:22 fails loudly and tells the operator to run --tags close, rather than
+# silently leaving a window open that may have broken the control-plane mesh.
+agent_access_verify_hard: true
