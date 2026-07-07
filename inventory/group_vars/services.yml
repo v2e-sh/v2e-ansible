@@ -4,7 +4,7 @@ ssh_allow_users: "v2e ansible"
 # --- v2e-compose deploy (ANS-3). Non-secret config only. Secrets
 # (cf_dns_api_token, authelia_*) come from SOPS group_vars/all.yml. ---
 compose_stack_repo_url: "https://github.com/v2e-sh/v2e-compose.git"
-compose_stack_dir: /opt/v2e-compose
+# compose_stack_dir: role default (/opt/v2e-compose) is fine here; not overridden.
 # Fail-fast before deploy: the traefik (DNS-01) + authelia secrets must be present.
 compose_stack_required_secrets:
   - cf_dns_api_token
@@ -21,6 +21,16 @@ compose_stack_required_secrets:
   - authelia_oidc_arcane_client_secret        # plaintext (Arcane OIDC_CLIENT_SECRET)
   - authelia_oidc_grafana_client_secret       # plaintext (Grafana GENERIC_OAUTH secret)
   - vaultwarden_admin_token                   # Vaultwarden /admin panel token
+  # Semaphore — all hard `${VAR:?...}` in v2e-compose/semaphore/compose.yml:
+  - semaphore_db_pass
+  - semaphore_admin_password
+  - semaphore_access_key_encryption
+  - semaphore_runner_reg_token
+  # Arcane — hard `${VAR:?...}` in v2e-compose/arcane/compose.yml:
+  - arcane_encryption_key
+  - arcane_jwt_secret
+  # Observability (Grafana) — hard `${VAR:?...}` in v2e-compose/observability/compose.yml:
+  - grafana_admin_password
 compose_stack_stacks:
   - traefik
   - authelia        # SSO: forward-auth (authelia@docker) + OIDC provider
