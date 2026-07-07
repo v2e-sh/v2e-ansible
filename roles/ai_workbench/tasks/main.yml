@@ -47,6 +47,30 @@
     state: present
   loop: "{{ ai_workbench_npm_global }}"
 
+# The @anthropic-ai/claude-code global install does not reliably link a `claude`
+# executable onto the login PATH (npm ships the CLI as a nested platform binary /
+# launcher, so `claude` was command-not-found for every account — which also made the
+# superpowers preseed a silent no-op). Resolve each package's real launcher from its
+# package.json `bin` field and link it into /usr/local/bin so every account sees it.
+- name: Link the AI CLIs onto the system PATH
+  ansible.builtin.shell: |
+    set -euo pipefail
+    root=$(npm root -g)
+    changed=0
+    for spec in "@anthropic-ai/claude-code:claude" "@openai/codex:codex"; do
+      pkg=${spec%%:*}; name=${spec##*:}
+      [ -d "$root/$pkg" ] || continue
+      launcher=$(node -e "const p=require('$root/$pkg/package.json');const b=p.bin;const t=(typeof b==='string')?b:b['$name'];console.log(require('path').resolve('$root/$pkg',t))")
+      [ -f "$launcher" ] || continue
+      target="/usr/local/bin/$name"
+      if [ "$(readlink -f "$target" 2>/dev/null)" != "$launcher" ]; then
+        ln -sf "$launcher" "$target"; changed=1
+      fi
+    done
+    echo "changed=$changed"
+  register: ai_workbench_cli_links
+  changed_when: "'changed=1' in ai_workbench_cli_links.stdout"
+
 # --- superpowers plugin (per Claude account) ---
 # Idempotent: `creates` skips on re-runs once the plugins dir exists, and `|| true`
 # tolerates an already-registered marketplace/plugin. Confirm the plugins path and
