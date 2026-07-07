@@ -131,6 +131,9 @@
     owner: root
     group: root
     force: true
+    # Manage the LINK, not its target. Without this, ansible follows the symlink and
+    # chowns the real vault to root:root, so the agent user can no longer execute it.
+    follow: false
 
 - name: Add the Superpowers marketplace and install the plugin
   become: true
