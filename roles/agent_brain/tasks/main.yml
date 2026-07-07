@@ -52,15 +52,20 @@
     group: "{{ agent_brain_group }}"
     mode: "0600"
     marker: "# {mark} ANSIBLE MANAGED AGENT BRAIN"
+    # The agent subnet's egress firewall blocks outbound SSH (port 22), so a normal
+    # git@github.com clone times out. GitHub serves SSH over 443 at ssh.github.com,
+    # and 443 egress is open (npm/plugins use it) — route the deploy keys through it.
     block: |
       Host github-agents-public
-        HostName github.com
+        HostName ssh.github.com
+        Port 443
         User git
         IdentityFile ~/.ssh/agent_brain_public
         IdentitiesOnly yes
 
       Host github-agents-private
-        HostName github.com
+        HostName ssh.github.com
+        Port 443
         User git
         IdentityFile ~/.ssh/agent_brain_private
         IdentitiesOnly yes
