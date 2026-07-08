@@ -1,0 +1,84 @@
+---
+# Operator switch that opens/closes the AI agent's jump-host reach (agent VLAN ->
+# control:22) for a bounded production-readiness test window, then re-hardens
+# with zero residue. Run from control as the `ansible` user. Pick exactly one
+# action by tag:
+#
+#   ansible-playbook playbooks/ops/agent-access.yml --tags open   # authorize key -> open rule -> verify mesh
+#   ansible-playbook playbooks/ops/agent-access.yml --tags close  # cut rule -> deauthorize key
+#
+# Ordering across the 5 plays is LOAD-BEARING (see roles/agent_access/README.md):
+#   OPEN:  key first (so the path has somewhere to land before it opens), then
+#          the rule (so the path opens last), then verify (confirm the mesh
+#          survived).
+#   CLOSE: rule first (cut the path), then key (deauthorize) — the reverse of
+#          OPEN, so there is never a window where the key is authorized but the
+#          rule is neither open (mid-OPEN) nor already cut (mid-CLOSE).
+#
+# Each play forces agent_access_state + agent_access_half itself, so there is
+# nothing to fat-finger. Every play also carries `never`: a tagless
+# `ansible-playbook playbooks/ops/agent-access.yml` does NOTHING — an explicit
+# action tag is required, same guard as killswitch.yml.
+#
+# ⚠️ Landing account is v2e (Option A — see README): its control-side key also
+# reaches VyOS. Operate the kill switch OUT-OF-BAND (Mac / Proxmox console)
+# during any open window.
+
+- name: Agent access — OPEN 1/3 (authorize key on control)
+  hosts: control
+  become: true
+  tags:
+    - never
+    - open
+  roles:
+    - role: agent_access
+      vars:
+        agent_access_state: open
+        agent_access_half: key
+
+- name: Agent access — OPEN 2/3 (open the forward-filter rule on vyos)
+  hosts: vyos
+  gather_facts: false
+  tags:
+    - never
+    - open
+  roles:
+    - role: agent_access
+      vars:
+        agent_access_state: open
+        agent_access_half: rule
+
+- name: Agent access — OPEN 3/3 (verify the mesh survived, from control)
+  hosts: control
+  tags:
+    - never
+    - open
+  roles:
+    - role: agent_access
+      vars:
+        agent_access_state: open
+        agent_access_half: verify
+
+- name: Agent access — CLOSE 1/2 (cut the forward-filter rule on vyos)
+  hosts: vyos
+  gather_facts: false
+  tags:
+    - never
+    - close
+  roles:
+    - role: agent_access
+      vars:
+        agent_access_state: close
+        agent_access_half: rule
+
+- name: Agent access — CLOSE 2/2 (deauthorize key on control)
+  hosts: control
+  become: true
+  tags:
+    - never
+    - close
+  roles:
+    - role: agent_access
+      vars:
+        agent_access_state: close
+        agent_access_half: key

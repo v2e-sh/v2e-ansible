@@ -1,0 +1,36 @@
+---
+# Post-open reachability check, run on control after the rule+key are live.
+# TCP reachability only, NOT SSH-auth — this play has no credentials to attempt
+# a real handshake with. agent_access_verify_hard (default true) turns an
+# unreachable target into a hard failure instead of a silent maybe-it's-fine.
+
+- name: Agent access — verify TCP reachability to services (22)
+  ansible.builtin.wait_for:
+    host: "{{ agent_access_services_ip }}"
+    port: 22
+    timeout: 10
+    state: started
+  register: agent_access_verify_services
+  ignore_errors: true
+
+- name: Agent access — verify TCP reachability to vyos (22)
+  ansible.builtin.wait_for:
+    host: "{{ agent_access_vyos_ip }}"
+    port: 22
+    timeout: 10
+    state: started
+  register: agent_access_verify_vyos
+  ignore_errors: true
+
+- name: Agent access — hard-gate on verification
+  ansible.builtin.assert:
+    that:
+      - agent_access_verify_services is succeeded
+      - agent_access_verify_vyos is succeeded
+    fail_msg: >-
+      Agent access opened but control's TCP reachability check failed
+      (services:22 and/or vyos:22). This may indicate the rule/key change
+      broke the control-plane mesh. Run
+      `ansible-playbook playbooks/ops/agent-access.yml --tags close`
+      immediately and investigate before retrying.
+  when: agent_access_verify_hard

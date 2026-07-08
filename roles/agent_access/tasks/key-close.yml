@@ -1,0 +1,15 @@
+---
+# Close = re-harden. Strip EVERY agent key (claude AND codex, whichever opened
+# it) from the landing account's authorized_keys by an ANCHORED comment match —
+# no hub round-trip, so this works even if the agent VLAN is already cut, and
+# regardless of which account a prior --tags open used. This is the ONLY
+# remover for the key half (unlike the rule half, there is no Terraform
+# baseline to self-heal to on reboot) — --tags close is mandatory after any
+# open window.
+
+- name: Agent access — strip agent keys from the landing account (anchored comment match)
+  ansible.builtin.lineinfile:
+    path: "/home/{{ agent_access_landing_account }}/.ssh/authorized_keys"
+    regexp: '@v2e-ai\s*$'
+    state: absent
+  failed_when: false

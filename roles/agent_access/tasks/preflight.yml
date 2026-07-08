@@ -1,0 +1,71 @@
+---
+# Hard-fail guards run before any OPEN change lands. Runs on both the key half
+# (host=control) and the rule half (host=vyos), so every check below reaches
+# across hostvars/delegation rather than assuming local host context. Also the
+# sole place that slurps + decodes the agent pubkey — key-open.yml reuses the
+# agent_access_pubkey fact this sets rather than reading it a second time.
+
+- name: "Preflight — assert the rule number sits above the killswitch reserve: {{ agent_access_rule }}"
+  ansible.builtin.assert:
+    that: agent_access_rule > agent_access_killswitch_reserve_end
+    fail_msg: >-
+      agent_access_rule ({{ agent_access_rule }}) must be numbered ABOVE the
+      killswitch reserve ({{ agent_access_killswitch_reserve_start }}-
+      {{ agent_access_killswitch_reserve_end }}). VyOS matches
+      lowest-number-first: the kill switch's drop at
+      {{ agent_access_killswitch_reserve_end }} must win over this accept
+      whenever both are active, so this rule cannot be numbered below or inside
+      the reserve.
+
+- name: "Preflight — assert the rule number does not collide with the baseline: {{ agent_access_rule }}"
+  ansible.builtin.assert:
+    that: agent_access_rule not in agent_access_baseline_rules
+    fail_msg: >-
+      agent_access_rule ({{ agent_access_rule }}) collides with the v2e-tf
+      cloud-init baseline forward-filter rules
+      ({{ agent_access_baseline_rules | join(', ') }}). Pick a different number.
+
+- name: Preflight — assert the landing account is in control's ssh_allow_users
+  ansible.builtin.assert:
+    that: agent_access_landing_account in hostvars[groups['control'][0]].ssh_allow_users.split()
+    fail_msg: >-
+      Landing account '{{ agent_access_landing_account }}' is not in control's
+      ssh_allow_users
+      ('{{ hostvars[groups['control'][0]].ssh_allow_users }}'). sshd will
+      reject the login even after the key is authorized.
+
+- name: Preflight — read the agent's public key from the hub
+  ansible.builtin.slurp:
+    path: "/home/{{ agent_access_ai_account }}/.ssh/id_ed25519.pub"
+  register: agent_access_pubkey_slurp
+  delegate_to: "{{ agent_access_hub_host }}"
+  failed_when: false
+
+- name: Preflight — assert the agent keypair exists on the hub
+  ansible.builtin.assert:
+    that: agent_access_pubkey_slurp.content is defined
+    fail_msg: >-
+      No {{ agent_access_ai_account }} keypair found on the hub
+      ({{ agent_access_hub_host }}) at ~/.ssh/id_ed25519.pub. This role does not
+      generate keys — run playbooks/ops/agents.yml first.
+
+- name: Preflight — decode the agent pubkey
+  ansible.builtin.set_fact:
+    agent_access_pubkey: "{{ agent_access_pubkey_slurp.content | b64decode }}"
+
+- name: Preflight — assert the agent pubkey looks like ssh-ed25519
+  ansible.builtin.assert:
+    that: agent_access_pubkey.startswith('ssh-ed25519 ')
+    fail_msg: >-
+      Agent pubkey at {{ agent_access_hub_host }}:~/.ssh/id_ed25519.pub does
+      not look like an ssh-ed25519 key (got: '{{ agent_access_pubkey[:20] }}...').
+
+- name: "Preflight — WARNING: landing account also reaches vyos (Option A)"
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: landing account '{{ agent_access_landing_account }}' has a
+      control-side key that also reaches the VyOS router (the existing
+      v2e/ansible mesh). For the duration of this open window, operate the
+      kill switch OUT-OF-BAND (operator Mac / Proxmox console) — a jumped-in
+      agent could otherwise reach the router and undo an in-band kill switch.
+      See roles/agent_access/README.md.

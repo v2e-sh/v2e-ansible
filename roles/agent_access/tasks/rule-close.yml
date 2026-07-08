@@ -1,0 +1,13 @@
+---
+# Delete the temporary rule. failed_when:false keeps this idempotent — VyOS
+# errors deleting a node that doesn't exist, so a plain --tags close is safe to
+# run even if the rule was never opened, or was already reaped by a reboot
+# (agent_access_save defaults false, so it doesn't survive one).
+
+- name: Agent access — close the forward-filter rule (agent -> control:22)
+  vyos.vyos.vyos_config:
+    lines:
+      - "delete firewall ipv4 forward filter rule {{ agent_access_rule }}"
+    comment: "ansible agent_access close (rule)"
+    save: "{{ agent_access_save }}"
+  failed_when: false
