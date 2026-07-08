@@ -63,7 +63,7 @@ non-payload report.
 | `egress_tap_rotate_seconds` | `60` |
 | `egress_tap_max_files` | `20` |
 | `egress_tap_capture_dir` | `/run/egress-tap` (tmpfs — self-clears on reboot) |
-| `egress_tap_fetch_dest` | `~/egress-tap-captures/{{ inventory_hostname }}` on the control host |
+| `egress_tap_fetch_dest` | `/home/{{ ansible_user \| default('ansible') }}/egress-tap-captures/{{ inventory_hostname }}` on the control host |
 
 ## Prerequisites (unverified — flag for the operator)
 

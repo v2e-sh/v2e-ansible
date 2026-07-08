@@ -1,7 +1,7 @@
 # ai_identities
 
 Per-AI-agent Unix identities and their SSH mesh, provisioned by Ansible. Run
-against the `linux` group (see `agents.yml`).
+against the `linux` group (see `playbooks/ops/agents.yml`).
 
 For each account in `ai_identities_roster` (default `claude`, `codex`) on every
 Linux node:
