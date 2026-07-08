@@ -1,0 +1,48 @@
+---
+# Stops the capture (idempotent — RuntimeMaxSec may have already ended it),
+# fetches the bounded pcap set off the router, then deletes the on-router
+# copy. tmpfs would self-clear on reboot anyway; this is the normal-path
+# cleanup so pcaps don't linger on the router between runs.
+
+- name: Egress tap — stop the capture unit
+  ansible.builtin.systemd_service:
+    name: "{{ egress_tap_unit_name }}"
+    state: stopped
+  failed_when: false
+
+- name: Egress tap — list captured files
+  ansible.builtin.command:
+    cmd: "sh -c 'ls {{ egress_tap_capture_dir }}/*.pcap 2>/dev/null'"
+  register: egress_tap_file_list
+  changed_when: false
+  failed_when: false
+
+- name: Egress tap — ensure local fetch destination exists
+  ansible.builtin.file:
+    path: "{{ egress_tap_fetch_dest }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+
+- name: Egress tap — fetch each pcap off the router
+  ansible.builtin.fetch:
+    src: "{{ item }}"
+    dest: "{{ egress_tap_fetch_dest }}/"
+    flat: true
+  loop: "{{ egress_tap_file_list.stdout_lines }}"
+  when: egress_tap_file_list.stdout_lines | length > 0
+
+- name: Egress tap — delete on-router copies after successful fetch
+  ansible.builtin.command:
+    cmd: "sh -c 'rm -f {{ egress_tap_capture_dir }}/*.pcap'"
+  changed_when: true
+  when: egress_tap_file_list.stdout_lines | length > 0
+
+- name: Egress tap — report
+  ansible.builtin.debug:
+    msg: >-
+      egress-tap stopped. {{ egress_tap_file_list.stdout_lines | length }}
+      pcap file(s) fetched to {{ egress_tap_fetch_dest }} on the control
+      host and removed from the router. Pcaps are secret-adjacent — never
+      commit them to git; feed them to scripts/egress-analysis.py for a
+      classified (non-payload) report.

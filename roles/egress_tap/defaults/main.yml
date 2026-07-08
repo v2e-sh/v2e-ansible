@@ -1,0 +1,44 @@
+---
+# Bounded, reversible WAN egress capture. Mirrors roles/agent_access and
+# roles/killswitch conventions: additive, removable, forced by
+# playbooks/ops/egress-tap.yml's tags — do not override egress_tap_state
+# directly with -e.
+
+# start | stop | status. Forced by egress-tap.yml's plays — never set directly.
+egress_tap_state: status
+
+# WAN only — this is an *egress* visibility tool, not general LAN capture.
+egress_tap_interface: "eth0"
+
+# Hard, systemd-enforced cap: the capture unit self-terminates after this
+# many seconds even if `--tags stop` is never run. This is the self-healing
+# property — it does not depend on operator discipline the way the
+# agent_access/killswitch interaction does (see that role's README).
+egress_tap_duration_seconds: 900
+
+# Headers only by default (Ethernet+IP+TCP/UDP, no payload). The WAN
+# interface carries NAT'd traffic for every internal host; a full-payload
+# capture is a real secret/PII exposure risk. Set egress_tap_full_payload
+# true (which raises this to 262144) only for a specific, short, justified
+# capture — never as a standing default.
+egress_tap_snaplen: 96
+egress_tap_full_payload: false
+egress_tap_full_payload_snaplen: 262144
+
+# Per-file rotation + max file count: two independent bounds on total disk
+# use (rotate_seconds x max_files caps total captured wall-clock time
+# regardless of egress_tap_duration_seconds, and each file is capped in
+# isolation so a burst can't blow one file past a sane size).
+egress_tap_rotate_seconds: 60
+egress_tap_max_files: 20
+
+# tmpfs — self-clears on reboot even if stop/cleanup is never run. Never a
+# path VyOS persists across commit/save.
+egress_tap_capture_dir: "/run/egress-tap"
+
+# Where `stop` fetches the bounded pcap set to, on the control host running
+# this playbook. Pcaps are secret-adjacent (raw traffic) — never fetched
+# into a git-tracked path.
+egress_tap_fetch_dest: "/home/{{ ansible_user | default('ansible') }}/egress-tap-captures/{{ inventory_hostname }}"
+
+egress_tap_unit_name: "egress-tap"

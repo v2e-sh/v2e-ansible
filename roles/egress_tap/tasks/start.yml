@@ -1,0 +1,59 @@
+---
+# Launches a transient, self-terminating tcpdump capture via systemd-run.
+# No VyOS `set`/`commit`/`save` — zero persistent router config, unlike the
+# agent_access rule half. RuntimeMaxSec is the hard, systemd-enforced bound:
+# the unit dies on its own even if `--tags stop` is never run.
+
+- name: Egress tap — check for an already-running capture
+  ansible.builtin.systemd_service:
+    name: "{{ egress_tap_unit_name }}"
+  register: egress_tap_active_check
+
+- name: Egress tap — assert not already active
+  ansible.builtin.assert:
+    that: egress_tap_active_check.status.ActiveState | default('inactive') != 'active'
+    fail_msg: >-
+      egress-tap is already running. Run --tags status to check remaining
+      time, or --tags stop to end it before starting a new capture.
+
+- name: Egress tap — ensure capture directory exists (tmpfs)
+  ansible.builtin.command:
+    cmd: "mkdir -p {{ egress_tap_capture_dir }}"
+  changed_when: false
+
+- name: Egress tap — compute effective snaplen
+  ansible.builtin.set_fact:
+    egress_tap_effective_snaplen: >-
+      {{ egress_tap_full_payload_snaplen if egress_tap_full_payload
+         else egress_tap_snaplen }}
+
+- name: Egress tap — warn on full-payload capture
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: egress_tap_full_payload is true — this capture will include
+      packet payloads (potential cleartext secrets/PII) from every NAT'd
+      internal host's WAN traffic. Confirm this is intentional and handle
+      the resulting pcap as secret material.
+  when: egress_tap_full_payload
+
+- name: Egress tap — start bounded capture (systemd-run, self-terminating)
+  ansible.builtin.command:
+    cmd: >-
+      systemd-run --unit={{ egress_tap_unit_name }}
+      --property=RuntimeMaxSec={{ egress_tap_duration_seconds }}
+      --description="bounded egress tap (ansible egress_tap, self-terminating)"
+      tcpdump -i {{ egress_tap_interface }}
+      -s {{ egress_tap_effective_snaplen }}
+      -w {{ egress_tap_capture_dir }}/capture-%Y%m%d-%H%M%S.pcap
+      -G {{ egress_tap_rotate_seconds }}
+      -W {{ egress_tap_max_files }}
+  changed_when: true
+
+- name: Egress tap — report
+  ansible.builtin.debug:
+    msg: >-
+      egress-tap started on {{ egress_tap_interface }}, bounded to
+      {{ egress_tap_duration_seconds }}s (auto-stops even without --tags
+      stop), snaplen {{ egress_tap_effective_snaplen }}, rotating every
+      {{ egress_tap_rotate_seconds }}s up to {{ egress_tap_max_files }}
+      files in {{ egress_tap_capture_dir }} (tmpfs).
