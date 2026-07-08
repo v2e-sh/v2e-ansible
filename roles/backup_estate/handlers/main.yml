@@ -1,0 +1,5 @@
+---
+- name: Backup estate — reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  become: true

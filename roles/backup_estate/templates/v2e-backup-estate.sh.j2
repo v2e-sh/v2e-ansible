@@ -1,0 +1,88 @@
+#!/bin/bash
+# Managed by Ansible (roles/backup_estate) — do not edit by hand, edit the
+# .j2 template instead.
+#
+# File-level backup: pg_dump targets + named Docker volumes + bind-mounted
+# state dirs, staged locally then rsynced to {{ backup_estate_target_dir }}
+# under a dated subdirectory. Deliberately excludes {{ backup_estate_exclude_patterns | join(', ') }}
+# from every bind-dir tar — this role backs up rendered state, never the
+# secret material that renders it (that already lives safely in SOPS).
+set -euo pipefail
+
+TARGET_ROOT="{{ backup_estate_target_dir }}"
+TEXTFILE_DIR="{{ backup_estate_textfile_dir }}"
+TEXTFILE="${TEXTFILE_DIR}/v2e_backup_estate.prom"
+RETAIN_DAYS={{ backup_estate_retain_days }}
+
+TIMESTAMP="$(date -u +%Y%m%d-%H%M%S)"
+STAGING="$(mktemp -d /tmp/v2e-backup-estate.XXXXXX)"
+DEST="${TARGET_ROOT}/${TIMESTAMP}"
+
+START_EPOCH="$(date +%s)"
+STATUS=1  # assume failure until the whole run completes; flipped to 0 at the very end
+
+write_metric() {
+  local end_epoch
+  end_epoch="$(date +%s)"
+  mkdir -p "${TEXTFILE_DIR}"
+  # Atomic write (tmp + mv) so node-exporter's textfile collector never reads
+  # a half-written file mid-scrape.
+  cat > "${TEXTFILE}.tmp" <<EOF
+# HELP v2e_backup_estate_last_run_timestamp_seconds Unix time the backup last completed (success or fail).
+# TYPE v2e_backup_estate_last_run_timestamp_seconds gauge
+v2e_backup_estate_last_run_timestamp_seconds ${end_epoch}
+# HELP v2e_backup_estate_last_run_success 1 if the last run succeeded, 0 otherwise.
+# TYPE v2e_backup_estate_last_run_success gauge
+v2e_backup_estate_last_run_success ${STATUS}
+# HELP v2e_backup_estate_last_run_duration_seconds Wall-clock duration of the last run.
+# TYPE v2e_backup_estate_last_run_duration_seconds gauge
+v2e_backup_estate_last_run_duration_seconds $((end_epoch - START_EPOCH))
+EOF
+  mv "${TEXTFILE}.tmp" "${TEXTFILE}"
+}
+
+# One combined handler: `trap ... EXIT` REPLACES any prior handler rather
+# than chaining, so both actions must live in a single function. Order
+# matters only in that both must run regardless of where the script exits
+# (STATUS stays 1 on any early failure under set -e).
+on_exit() {
+  write_metric
+  rm -rf "${STAGING}"
+}
+trap on_exit EXIT
+
+mkdir -p "${STAGING}"
+
+{% for dump in backup_estate_pg_dumps %}
+# --- pg_dump: {{ dump.name }} ---
+docker exec "{{ dump.container }}" pg_dump -U "{{ dump.user }}" "{{ dump.db }}" \
+  > "${STAGING}/{{ dump.name }}.sql"
+{% endfor %}
+
+{% for vol in backup_estate_docker_volumes %}
+# --- docker volume: {{ vol }} ---
+docker run --rm \
+  -v "{{ vol }}:/from:ro" \
+  -v "${STAGING}:/to" \
+  alpine:3.21 \
+  tar czf "/to/{{ vol }}.tar.gz" -C /from .
+{% endfor %}
+
+{% for dir in backup_estate_bind_dirs %}
+# --- bind dir: {{ dir.name }} ({{ dir.path }}) ---
+tar czf "${STAGING}/{{ dir.name }}.tar.gz" \
+{% for pattern in backup_estate_exclude_patterns %}
+  --exclude={{ pattern | quote }} \
+{% endfor %}
+  -C "$(dirname {{ dir.path | quote }})" "$(basename {{ dir.path | quote }})"
+{% endfor %}
+
+mkdir -p "${DEST}"
+mv "${STAGING}"/* "${DEST}/"
+
+# Prune dated subdirectories under the target older than RETAIN_DAYS. Only
+# runs after a successful stage+move, so a failed run never prunes good
+# older backups out from under a broken newest one.
+find "${TARGET_ROOT}" -mindepth 1 -maxdepth 1 -type d -mtime "+${RETAIN_DAYS}" -exec rm -rf {} +
+
+STATUS=0

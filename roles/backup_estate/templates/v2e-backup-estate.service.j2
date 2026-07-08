@@ -1,0 +1,11 @@
+[Unit]
+Description=v2e estate file-level backup (pg_dump + docker volumes + bind-mount state)
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart={{ backup_estate_script_path }}
+# Backups touch every named volume + a temp staging dir; give it real time
+# before systemd considers it hung, but still bounded (not infinite).
+TimeoutStartSec=1800

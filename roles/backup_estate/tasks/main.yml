@@ -1,0 +1,82 @@
+---
+# Tag-gated: every task below carries `never` plus its own tag, so a bare
+# playbook run does nothing (same convention as roles/killswitch and
+# roles/agent_access). --tags install sets up the script + timer without
+# running it; --tags run executes the script once immediately.
+
+- name: Backup estate — assert target dir is actually mounted
+  ansible.builtin.stat:
+    path: "{{ backup_estate_target_dir }}"
+  register: backup_estate_target_stat
+  tags: [never, install, run]
+
+- name: Backup estate — fail loudly if the target isn't there
+  ansible.builtin.assert:
+    that: backup_estate_target_stat.stat.exists and backup_estate_target_stat.stat.isdir
+    fail_msg: >-
+      backup_estate_target_dir ({{ backup_estate_target_dir }}) does not
+      exist or isn't a directory — mount the backup target before
+      installing or running this role. Refusing to silently write backups
+      nowhere.
+  tags: [never, install, run]
+
+- name: Backup estate — render the backup script
+  ansible.builtin.template:
+    src: v2e-backup-estate.sh.j2
+    dest: "{{ backup_estate_script_path }}"
+    owner: root
+    group: root
+    mode: "0700"
+  become: true
+  tags: [never, install]
+
+- name: Backup estate — ensure the node-exporter textfile dir exists
+  ansible.builtin.file:
+    path: "{{ backup_estate_textfile_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+  tags: [never, install]
+
+- name: Backup estate — render the systemd service unit
+  ansible.builtin.template:
+    src: v2e-backup-estate.service.j2
+    dest: "/etc/systemd/system/{{ backup_estate_unit_name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: "Backup estate — reload systemd"
+  tags: [never, install]
+
+- name: Backup estate — render the systemd timer unit
+  ansible.builtin.template:
+    src: v2e-backup-estate.timer.j2
+    dest: "/etc/systemd/system/{{ backup_estate_unit_name }}.timer"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: "Backup estate — reload systemd"
+  tags: [never, install]
+
+- name: Backup estate — flush handlers before enabling the timer
+  ansible.builtin.meta: flush_handlers
+  tags: [never, install]
+
+- name: Backup estate — enable and start the timer
+  ansible.builtin.systemd_service:
+    name: "{{ backup_estate_unit_name }}.timer"
+    enabled: true
+    state: started
+  become: true
+  tags: [never, install]
+
+- name: Backup estate — run the backup script once, now
+  ansible.builtin.command:
+    cmd: "{{ backup_estate_script_path }}"
+  become: true
+  changed_when: true
+  tags: [never, run]
