@@ -2,14 +2,16 @@
 
 **DESIGN, NOT YET APPLIED.** File-level backup of mutable estate state —
 `pg_dump` targets, named Docker volumes, and bind-mounted state directories
-— staged locally then rsynced to an external target (path from SOPS) under
+— staged locally then moved to an external target (path from SOPS) under
 a dated subdirectory, pruned by `backup_estate_retain_days`. Complements
 `v2e-tf`'s coarse `proxmox_backup_job` (whole-VM vzdump): this role is the
 fast, granular restore path (a single dashboard, a single cert, a single
 DB) where a whole-VM restore would be overkill.
 
-Tag-gated exactly like `roles/killswitch`/`roles/agent_access`: every task
-carries `never` plus its own tag. `--tags install` renders the script +
+Tag-gated in the same never-plus-explicit-tag spirit as `roles/killswitch`/
+`roles/agent_access` (a bare run does nothing), but applied at the task level
+here rather than the play level: every task in this role carries `never` plus
+its own tag directly. `--tags install` renders the script +
 systemd timer and enables it (does not run the backup itself); `--tags run`
 executes the backup script once, immediately, for manual testing or a
 first backup before the timer's first scheduled fire.
@@ -18,8 +20,9 @@ first backup before the timer's first scheduled fire.
 
 - **Does not manage the backup target's mount.** `backup_estate_target_dir`
   must already exist and be mounted (e.g. an NFS/SMB share from TrueNAS,
-  mounted by whatever role/fstab entry owns that) — the role's first task
-  asserts this and fails loudly rather than writing backups nowhere.
+  mounted by whatever role/fstab entry owns that) — the role's first two
+  tasks (a stat, then an assert) check this and fail loudly rather than
+  writing backups nowhere.
 - **Does not touch `.env`/secret files.** Every bind-dir tar explicitly
   excludes `.env`, `*.env`, and `secrets/*` — this role backs up *rendered*
   state, never the secret material that renders it (SOPS already owns that,
@@ -53,8 +56,8 @@ backup_estate_docker_volumes:
   - observability_grafana-data
   - observability_loki-data
   - observability_kuma-data
-  - authelia-data
-  - vaultwarden-data
+  - authelia_authelia-data
+  - vaultwarden_vaultwarden-data
 
 backup_estate_bind_dirs:
   - name: acme

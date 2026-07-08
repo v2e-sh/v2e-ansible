@@ -1,7 +1,7 @@
 # ai_workbench
 
 Turns the **agent** node into an AI workbench. Run against the `agent` host (see
-`agents.yml`); the accounts themselves come from the `ai_identities` role.
+`playbooks/ops/agents.yml`); the accounts themselves come from the `ai_identities` role.
 
 Installs:
 
@@ -17,8 +17,9 @@ Installs:
 
 ## Secrets
 
-Put the keys in an Ansible Vault file (e.g. `inventory/group_vars/all/vault.yml`,
-encrypted), referenced by `ai_workbench_anthropic_api_key` /
+Keys are SOPS-encrypted, not Ansible Vault — put them in `secrets.sops.yaml`,
+which lands as `inventory/group_vars/all.sops.yaml` and is auto-decrypted by the
+`community.sops.sops` vars plugin, referenced by `ai_workbench_anthropic_api_key` /
 `ai_workbench_openai_api_key`:
 
 ```yaml
