@@ -31,6 +31,10 @@ compose_stack_required_secrets:
   - arcane_jwt_secret
   # Observability (Grafana) — hard `${VAR:?...}` in v2e-compose/observability/compose.yml:
   - grafana_admin_password
+  # Grafana backup notification channel (v2e-compose #59, merged 2026-07-07) — also
+  # a hard `${VAR:?...}` in observability/compose.yml (DISCORD_WEBHOOK_URL), added
+  # after the original assert sweep so it was missed the first time around.
+  - grafana_discord_webhook_url
 compose_stack_stacks:
   - traefik
   - authelia        # SSO: forward-auth (authelia@docker) + OIDC provider
