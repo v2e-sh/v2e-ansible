@@ -6,7 +6,7 @@ ssh_allow_users: "v2e ansible"
 
 # --- compose_stack (phase 04) ---
 compose_stack_repo_url: "https://github.com/v2e-sh/v2e-compose.git"
-compose_stack_dir: /opt/v2e-compose
+# compose_stack_dir: role default (/opt/v2e-compose) is fine here; not overridden.
 compose_stack_stacks:
   - technitium
   - rustdesk
