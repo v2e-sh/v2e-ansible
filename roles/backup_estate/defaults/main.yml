@@ -1,0 +1,57 @@
+---
+# File-level backup of mutable estate state, complementing the coarse
+# whole-VM v2e-tf proxmox_backup_job (see backup.tf in that repo). Tag-gated
+# (`never`) — a bare `ansible-playbook` run of whatever playbook wires this
+# role in does NOT execute it; --tags install sets up the systemd timer,
+# --tags run executes the backup script once immediately (manual/testing).
+
+# Sourced from SOPS — a filesystem path, expected already mounted on this
+# host (e.g. an NFS/SMB share from TrueNAS). This role does not manage the
+# mount itself. No default: an unset target must fail loudly, not silently
+# write backups nowhere or somewhere wrong.
+backup_estate_target_dir: "{{ vault_backup_estate_target_dir | mandatory('set vault_backup_estate_target_dir via SOPS group_vars') }}"
+
+# Local retention on the TARGET (the role prunes dated subdirectories under
+# backup_estate_target_dir older than this many days after a successful run).
+backup_estate_retain_days: 14
+
+# Named Docker volumes to snapshot, project-prefixed exactly as Compose
+# creates them (project name = stack directory basename, confirmed against
+# roles/compose_stack's project_src convention — no explicit project_name
+# override exists anywhere in v2e-compose). Empty by default; each host
+# group sets its own list via group_vars (see README — services and infra
+# each own different stacks/volumes).
+backup_estate_docker_volumes: []
+
+# Bind-mounted directories to tar directly (not Docker volumes) — e.g.
+# Traefik's acme.json, Technitium's zone data. Each entry: {name, path}.
+# name becomes the archive filename; path is an absolute host path.
+backup_estate_bind_dirs: []
+
+# Postgres pg_dump targets. Each entry: {name, container, db, user}. The
+# password is read from the container's own environment at exec time (never
+# duplicated into this role's vars) via `docker exec <container> env`.
+backup_estate_pg_dumps: []
+
+# Every exclude pattern is applied to bind-dir tars (docker volumes are
+# assumed to hold only application state, never .env files, since Compose
+# never mounts a project's .env INTO a named volume). Defense in depth even
+# though no currently-listed bind dir is expected to contain one.
+backup_estate_exclude_patterns:
+  - ".env"
+  - "*.env"
+  - "secrets/*"
+
+backup_estate_script_path: /usr/local/sbin/v2e-backup-estate.sh
+backup_estate_unit_name: v2e-backup-estate
+
+# systemd calendar-event schedule. 1h after the proxmox_backup_job default
+# (02:00) so the coarse VM snapshot and the file-level backup don't compete
+# for disk I/O on the same host at the same moment.
+backup_estate_schedule: "*-*-* 03:00:00"
+
+# node-exporter textfile collector directory (charter AREA 5.4 — backup-job
+# observability — reads this once it exists). Writing the metric now costs
+# nothing and means that follow-on task has something to scrape immediately
+# rather than needing a second role change.
+backup_estate_textfile_dir: /var/lib/node_exporter/textfile_collector

@@ -1,0 +1,21 @@
+---
+# File-level estate backup. Every play is `never`-tagged (roles/backup_estate
+# tasks also carry never), so a bare
+# `ansible-playbook playbooks/ops/backup-estate.yml` does nothing.
+#
+# Targets services + infra (both run compose_stack stacks with state worth
+# backing up — see roles/backup_estate/README.md for which host owns which
+# backup_estate_docker_volumes/backup_estate_bind_dirs/backup_estate_pg_dumps
+# entries, set per-host via group_vars, not in this playbook).
+
+- name: Backup estate — install (script + systemd timer, does not run it)
+  hosts: services:infra
+  tags: [never, install]
+  roles:
+    - backup_estate
+
+- name: Backup estate — run once now (manual/testing)
+  hosts: services:infra
+  tags: [never, run]
+  roles:
+    - backup_estate

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run v2e-backup-estate.service on a schedule
+
+[Timer]
+OnCalendar={{ backup_estate_schedule }}
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
