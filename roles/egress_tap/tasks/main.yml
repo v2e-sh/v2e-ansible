@@ -1,0 +1,11 @@
+---
+# Dispatch on egress_tap_state. Driven by egress-tap.yml's tags; each of its
+# 3 plays forces the var itself, so there is nothing to fat-finger.
+
+- name: Validate egress_tap_state
+  ansible.builtin.assert:
+    that: egress_tap_state in ['start', 'stop', 'status']
+    fail_msg: "egress_tap_state must be one of: start, stop, status"
+
+- name: "Egress tap — run the state task file: {{ egress_tap_state }}"
+  ansible.builtin.include_tasks: "{{ egress_tap_state }}.yml"

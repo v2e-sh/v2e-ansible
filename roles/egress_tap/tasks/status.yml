@@ -1,0 +1,24 @@
+---
+# Read-only. Safe to run anytime, including mid-capture, to sanity-check
+# remaining bound before deciding whether to stop early. No fetch, no
+# cleanup, no side effects.
+
+- name: Egress tap — unit status
+  ansible.builtin.systemd_service:
+    name: "{{ egress_tap_unit_name }}"
+  register: egress_tap_status
+
+- name: Egress tap — capture directory usage
+  ansible.builtin.command:
+    cmd: "sh -c 'du -sh {{ egress_tap_capture_dir }} 2>/dev/null; ls -la {{ egress_tap_capture_dir }} 2>/dev/null'"
+  register: egress_tap_dir_usage
+  changed_when: false
+  failed_when: false
+
+- name: Egress tap — report
+  ansible.builtin.debug:
+    msg:
+      - "ActiveState: {{ egress_tap_status.status.ActiveState | default('unknown') }}"
+      - "SubState: {{ egress_tap_status.status.SubState | default('unknown') }}"
+      - "ActiveEnterTimestamp: {{ egress_tap_status.status.ActiveEnterTimestamp | default('n/a') }}"
+      - "{{ egress_tap_dir_usage.stdout_lines }}"

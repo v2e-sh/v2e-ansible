@@ -1,0 +1,53 @@
+---
+# Bounded, reversible WAN egress tap. Mirrors playbooks/ops/agent-access.yml
+# and playbooks/ops/killswitch.yml: every play is `never`-tagged, so a bare
+# `ansible-playbook playbooks/ops/egress-tap.yml` does nothing.
+#
+# CONNECTION MODEL — deliberate deviation, read before running:
+# inventory/hosts.ini's [vyos:vars] pins ansible_connection to
+# ansible.netcommon.network_cli specifically because the router is "not
+# python" (see the inventory comment and [[ansible-inventory-vyos-carve-out]]
+# in the brain) — network_cli only supports structured VyOS op-mode/config
+# commands, not arbitrary shell execution, so it cannot run tcpdump/
+# systemd-run/scp-style retrieval. This role instead overrides
+# ansible_connection to plain `ssh` for its three plays only, landing in
+# vbash — VyOS's login shell, which (unlike network_cli) is a real,
+# unrestricted bash with the standard command/fetch/file Ansible modules
+# available given VyOS's own tooling requires python3 on-box. `become: true`
+# is required because tcpdump needs CAP_NET_RAW and systemd-run needs root.
+# CONFIRM python3 and passwordless sudo are actually present for the
+# `vyos_user`/`ansible` account on the live router before ever running this
+# for real — this design has not been applied or tested against a live box.
+
+- name: Egress tap — start (bounded capture)
+  hosts: vyos
+  gather_facts: false
+  become: true
+  vars:
+    ansible_connection: ssh
+    egress_tap_state: start
+  tags: [never, start]
+  roles:
+    - egress_tap
+
+- name: Egress tap — status
+  hosts: vyos
+  gather_facts: false
+  become: true
+  vars:
+    ansible_connection: ssh
+    egress_tap_state: status
+  tags: [never, status]
+  roles:
+    - egress_tap
+
+- name: Egress tap — stop (fetch + clean up)
+  hosts: vyos
+  gather_facts: false
+  become: true
+  vars:
+    ansible_connection: ssh
+    egress_tap_state: stop
+  tags: [never, stop]
+  roles:
+    - egress_tap
