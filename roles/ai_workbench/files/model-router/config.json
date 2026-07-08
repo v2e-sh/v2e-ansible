@@ -1,0 +1,36 @@
+{
+  "tiers": {
+    "haiku": "claude-haiku-4-5-20251001",
+    "sonnet": "claude-sonnet-5",
+    "opus": "claude-opus-4-8"
+  },
+  "default_tier": "sonnet",
+  "max_escalations": 2,
+  "hard_floor_rules": [
+    {
+      "id": "security-sensitive",
+      "pattern": "(?i)\\b(security review|vulnerabilit\\w*|exploit|penetration test|pentest|CVE-\\d|credential\\w*|secrets?)\\b",
+      "reason": "security-sensitive work"
+    },
+    {
+      "id": "risk-tier-high-critical",
+      "pattern": "(?i)\\b(HIGH[- ]tier|CRITICAL[- ]tier|risk[- ]tier:?\\s*(high|critical))\\b",
+      "reason": "HIGH/CRITICAL risk-tier change"
+    },
+    {
+      "id": "auth",
+      "pattern": "(?i)\\b(auth\\w*|sso|oauth|saml|authelia|authentik|login flow)\\b",
+      "reason": "auth-related change"
+    },
+    {
+      "id": "network",
+      "pattern": "(?i)\\b(firewall|iptables|nftables|dns|reverse[- ]proxy|proxy config\\w*|traefik|vlan|routing table|network segmentation)\\b",
+      "reason": "network/firewall/DNS/proxy change"
+    },
+    {
+      "id": "architecture-or-plan",
+      "pattern": "(?i)\\b(architecture|design doc\\w*|implementation plan|ADR)\\b",
+      "reason": "architecture or plan-writing"
+    }
+  ]
+}

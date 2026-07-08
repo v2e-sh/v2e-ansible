@@ -25,3 +25,9 @@ ai_workbench_codex_accounts:
   - codex
 ai_workbench_anthropic_api_key: "{{ vault_anthropic_api_key | default('') }}"
 ai_workbench_openai_api_key: "{{ vault_openai_api_key | default('') }}"
+
+# model-router: right-sizes the model agent-run picks (see the v2e-agents
+# brain repo, .claude/skills/model-router, chore/brain-model-router). Toggle
+# per-run via the AGENT_RUN_MODEL_ROUTER=0 env var; this var only governs
+# whether the role installs the router files.
+ai_workbench_model_router_enabled: true

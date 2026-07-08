@@ -15,8 +15,25 @@ if [ -f "$env_file" ]; then
   set +a
 fi
 
+# model-router: right-sizes the --model flag for claude runs (hard floor for
+# security/auth/network/architecture/plan work, else a cheap Haiku triage
+# call). AGENT_RUN_MODEL_ROUTER=0 skips it; a missing/failing router never
+# blocks the run, it just falls back to Claude Code's own default model.
+router="/usr/local/lib/agent-run/model-router/router.py"
+model_flag=()
+if [ "$tool" = "claude" ] && [ "${AGENT_RUN_MODEL_ROUTER:-1}" != "0" ] && [ -x "$router" ]; then
+  if decision="$("$router" route "$prompt" --retry "${AGENT_RUN_RETRY:-0}" 2>/dev/null)"; then
+    model="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])['model'])" "$decision" 2>/dev/null || true)"
+    if [ -n "$model" ]; then
+      reason="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])['reason'])" "$decision" 2>/dev/null || true)"
+      echo "agent-run: model-router -> $model ($reason)" >&2
+      model_flag=(--model "$model")
+    fi
+  fi
+fi
+
 case "$tool" in
-  claude) exec claude -p "$prompt" ;;
+  claude) exec claude -p "$prompt" "${model_flag[@]}" ;;
   codex)  exec codex exec "$prompt" ;;
   *) echo "usage: agent-run <claude|codex> <prompt>" >&2; exit 2 ;;
 esac

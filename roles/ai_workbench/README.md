@@ -14,6 +14,12 @@ Installs:
   fails without a vault; log in interactively later,
 - `/usr/local/bin/agent-run`, a headless wrapper: `agent-run claude "<prompt>"`
   (→ `claude -p`) or `agent-run codex "<prompt>"` (→ `codex exec`).
+- `/usr/local/lib/agent-run/model-router/` (`router.py` + `config.json`),
+  right-sizing the `--model` flag `agent-run claude` execs with — hard floor
+  for security/auth/network/architecture/plan work, else a cheap Haiku
+  triage call. `AGENT_RUN_MODEL_ROUTER=0` skips it. Source of truth:
+  v2e-agents brain repo, `.claude/skills/model-router`
+  (`chore/brain-model-router`).
 
 ## Secrets
 
