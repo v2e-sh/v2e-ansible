@@ -1,0 +1,333 @@
+---
+- name: Assert agent-brain deploy keys are present
+  ansible.builtin.assert:
+    that:
+      - agent_brain_public_deploy_key | trim | length > 0
+      - agent_brain_private_deploy_key | trim | length > 0
+    fail_msg: >-
+      agent_brain needs separate public/private GitHub deploy keys from SOPS.
+      Register each public key on its matching repository, then re-run.
+    quiet: true
+
+- name: Install agent-brain runtime packages
+  ansible.builtin.apt:
+    name:
+      - git
+      - openssh-client
+      - pipx
+      - python3
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure agent SSH directory exists
+  ansible.builtin.file:
+    path: "/home/{{ agent_brain_user }}/.ssh"
+    state: directory
+    owner: "{{ agent_brain_user }}"
+    group: "{{ agent_brain_group }}"
+    mode: "0700"
+
+- name: Render repository-scoped deploy keys
+  ansible.builtin.copy:
+    content: "{{ item.content | trim }}\n"
+    dest: "/home/{{ agent_brain_user }}/.ssh/{{ item.name }}"
+    owner: "{{ agent_brain_user }}"
+    group: "{{ agent_brain_group }}"
+    mode: "0600"
+  loop:
+    - name: agent_brain_public
+      content: "{{ agent_brain_public_deploy_key }}"
+    - name: agent_brain_private
+      content: "{{ agent_brain_private_deploy_key }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+
+- name: Configure GitHub aliases for repository-scoped keys
+  ansible.builtin.blockinfile:
+    path: "/home/{{ agent_brain_user }}/.ssh/config"
+    create: true
+    owner: "{{ agent_brain_user }}"
+    group: "{{ agent_brain_group }}"
+    mode: "0600"
+    marker: "# {mark} ANSIBLE MANAGED AGENT BRAIN"
+    # The agent subnet's egress firewall blocks outbound SSH (port 22), so a normal
+    # git@github.com clone times out. GitHub serves SSH over 443 at ssh.github.com,
+    # and 443 egress is open (npm/plugins use it) — route the deploy keys through it.
+    block: |
+      Host github-agents-public
+        HostName ssh.github.com
+        Port 443
+        User git
+        IdentityFile ~/.ssh/agent_brain_public
+        IdentitiesOnly yes
+
+      Host github-agents-private
+        HostName ssh.github.com
+        Port 443
+        User git
+        IdentityFile ~/.ssh/agent_brain_private
+        IdentitiesOnly yes
+
+- name: Ensure public checkout parent is agent-owned
+  ansible.builtin.file:
+    path: "{{ agent_brain_dir }}"
+    state: directory
+    owner: "{{ agent_brain_user }}"
+    group: "{{ agent_brain_group }}"
+    mode: "0755"
+
+- name: Clone or fast-forward the public agents repository
+  become: true
+  become_user: "{{ agent_brain_user }}"
+  ansible.builtin.git:
+    repo: "{{ agent_brain_public_repo }}"
+    dest: "{{ agent_brain_dir }}"
+    version: "{{ agent_brain_repo_version }}"
+    update: true
+    accept_newhostkey: true
+
+- name: Clone or fast-forward private memory into the vault
+  become: true
+  become_user: "{{ agent_brain_user }}"
+  ansible.builtin.git:
+    repo: "{{ agent_brain_private_repo }}"
+    dest: "{{ agent_brain_dir }}/.claude/notes/private"
+    version: "{{ agent_brain_repo_version }}"
+    update: true
+    accept_newhostkey: true
+
+- name: Enable the public repository leak guard
+  become: true
+  become_user: "{{ agent_brain_user }}"
+  community.general.git_config:
+    name: core.hooksPath
+    value: .githooks
+    scope: local
+    repo: "{{ agent_brain_dir }}"
+
+- name: Render local vault discovery config
+  ansible.builtin.template:
+    src: vaultrc.j2
+    dest: "{{ agent_brain_dir }}/.vaultrc"
+    owner: "{{ agent_brain_user }}"
+    group: "{{ agent_brain_group }}"
+    mode: "0644"
+
+- name: Export agent-brain environment for login shells
+  ansible.builtin.template:
+    src: agent-brain-profile.sh.j2
+    dest: /etc/profile.d/agent-brain.sh
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Symlink vault onto the system PATH
+  ansible.builtin.file:
+    src: "{{ agent_brain_dir }}/.claude/notes/.bin/vault"
+    dest: /usr/local/bin/vault
+    state: link
+    owner: root
+    group: root
+    force: true
+    # Manage the LINK, not its target. Without this, ansible follows the symlink and
+    # chowns the real vault to root:root, so the agent user can no longer execute it.
+    follow: false
+
+- name: Add the Superpowers marketplace and install the plugin
+  become: true
+  become_user: "{{ agent_brain_user }}"
+  ansible.builtin.shell: |
+    set -uo pipefail
+    claude plugin marketplace add {{ agent_brain_superpowers_marketplace | quote }} || true
+    claude plugin install {{ agent_brain_superpowers_plugin | quote }} || true
+  args:
+    executable: /bin/bash
+  environment:
+    HOME: "/home/{{ agent_brain_user }}"
+  changed_when: false
+
+# The install step above tolerates re-adds; THIS task is the real gate. The previous
+# `creates: ~/.claude/plugins` guard was dead code — ai_workbench (phase 03) already
+# creates that dir, so the install always skipped and failures were swallowed.
+- name: Verify the Superpowers plugin is actually installed
+  become: true
+  become_user: "{{ agent_brain_user }}"
+  ansible.builtin.command:
+    cmd: claude plugin list
+  register: agent_brain_superpowers_plugins
+  changed_when: false
+  failed_when: >-
+    agent_brain_superpowers_plugins.rc != 0 or
+    'superpowers' not in agent_brain_superpowers_plugins.stdout
+  environment:
+    HOME: "/home/{{ agent_brain_user }}"
+  # BEST-EFFORT: `claude plugin` needs claude authenticated (rc=13 without a key/login),
+  # which is a one-time manual secret (vault_anthropic_api_key in SOPS, or `claude login`).
+  # Don't let an unauthenticated node block the rest of the brain deploy (vault, guard,
+  # timers) — this surfaces the miss but doesn't halt. Re-run once auth is in place.
+  ignore_errors: true
+
+- name: Install the Context7 marketplace and Claude plugin
+  become: true
+  become_user: "{{ agent_brain_user }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    claude plugin marketplace add {{ agent_brain_context7_marketplace | quote }} || true
+    claude plugin install {{ agent_brain_context7_plugin | quote }} || true
+  args:
+    executable: /bin/bash
+  environment:
+    HOME: "/home/{{ agent_brain_user }}"
+  changed_when: false
+  when: agent_brain_context7_enabled | bool
+
+- name: Verify the Context7 Claude plugin is available
+  become: true
+  become_user: "{{ agent_brain_user }}"
+  ansible.builtin.command:
+    cmd: claude plugin list
+  register: agent_brain_context7_plugins
+  changed_when: false
+  failed_when: >-
+    agent_brain_context7_plugins.rc != 0 or
+    'context7' not in agent_brain_context7_plugins.stdout
+  environment:
+    HOME: "/home/{{ agent_brain_user }}"
+  when: agent_brain_context7_enabled | bool
+  # Best-effort: needs claude authenticated (see the Superpowers verify note).
+  ignore_errors: true
+
+- name: Ensure private Context7 environment directory exists
+  ansible.builtin.file:
+    path: "/home/{{ agent_brain_user }}/.config/agent-brain"
+    state: directory
+    owner: "{{ agent_brain_user }}"
+    group: "{{ agent_brain_group }}"
+    mode: "0700"
+  when:
+    - agent_brain_context7_enabled | bool
+    - agent_brain_context7_api_key | trim | length > 0
+
+- name: Render optional Context7 API key environment
+  ansible.builtin.template:
+    src: context7.env.j2
+    dest: "/home/{{ agent_brain_user }}/.config/agent-brain/context7.env"
+    owner: "{{ agent_brain_user }}"
+    group: "{{ agent_brain_group }}"
+    mode: "0600"
+  no_log: true
+  when:
+    - agent_brain_context7_enabled | bool
+    - agent_brain_context7_api_key | trim | length > 0
+
+- name: Remove unused Context7 API key environment
+  ansible.builtin.file:
+    path: "/home/{{ agent_brain_user }}/.config/agent-brain/context7.env"
+    state: absent
+  when: >-
+    not agent_brain_context7_enabled | bool or
+    agent_brain_context7_api_key | trim | length == 0
+
+- name: Read the installed Graphify version
+  become: true
+  become_user: "{{ agent_brain_user }}"
+  ansible.builtin.command:
+    cmd: "/home/{{ agent_brain_user }}/.local/bin/graphify --version"
+  register: agent_brain_graphify_installed
+  changed_when: false
+  failed_when: false
+  when: agent_brain_graphify_enabled | bool
+
+# Ubuntu's packaged pipx can be older than community.general.pipx requires, so
+# use the stable CLI and reinstall only when the exact pinned version differs.
+- name: Install pinned Graphify with Terraform support  # noqa command-instead-of-module
+  become: true
+  become_user: "{{ agent_brain_user }}"
+  ansible.builtin.command:
+    cmd: "/usr/bin/pipx install --force {{ agent_brain_graphify_package | quote }}"
+  environment:
+    PIPX_HOME: "/home/{{ agent_brain_user }}/.local/pipx"
+    PIPX_BIN_DIR: "/home/{{ agent_brain_user }}/.local/bin"
+  changed_when: true
+  failed_when: false  # optional third-party tool — never block the brain deploy
+  when:
+    - agent_brain_graphify_enabled | bool
+    - >-
+      agent_brain_graphify_installed.rc != 0 or
+      agent_brain_graphify_version not in agent_brain_graphify_installed.stdout
+
+- name: Install the global Graphify skill for Claude Code
+  become: true
+  become_user: "{{ agent_brain_user }}"
+  ansible.builtin.command:
+    cmd: >-
+      /home/{{ agent_brain_user }}/.local/bin/graphify
+      install --platform claude
+  environment:
+    HOME: "/home/{{ agent_brain_user }}"
+    PIPX_HOME: "/home/{{ agent_brain_user }}/.local/pipx"
+    PIPX_BIN_DIR: "/home/{{ agent_brain_user }}/.local/bin"
+  changed_when: false
+  failed_when: false  # optional third-party tool — never block the brain deploy
+  when: agent_brain_graphify_enabled | bool
+
+# Graphify and Context7 are OPTIONAL accelerators (operator decision: demote from
+# mandatory). Their guidance lives in the agents repo's own CLAUDE.md as "use if
+# present, never depend on" — we deliberately do NOT inject mandatory protocol
+# blocks into the global ~/.claude/CLAUDE.md (that applied to every repo the agent
+# ever touched and hard-coupled the brain to an unproven third-party tool).
+
+- name: Ensure the agent's global Git ignore directory exists
+  ansible.builtin.file:
+    path: "/home/{{ agent_brain_user }}/.config/git"
+    state: directory
+    owner: "{{ agent_brain_user }}"
+    group: "{{ agent_brain_group }}"
+    mode: "0755"
+  when: agent_brain_graphify_enabled | bool
+
+- name: Keep derived Graphify output out of new repo status
+  ansible.builtin.lineinfile:
+    path: "/home/{{ agent_brain_user }}/.config/git/ignore"
+    create: true
+    line: graphify-out/
+    owner: "{{ agent_brain_user }}"
+    group: "{{ agent_brain_group }}"
+    mode: "0644"
+  when: agent_brain_graphify_enabled | bool
+
+- name: Install periodic public/private pull service
+  ansible.builtin.template:
+    src: agent-brain-pull.service.j2
+    dest: /etc/systemd/system/agent-brain-pull.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Enable agent-brain pull timer
+- name: Install periodic pull timer
+  ansible.builtin.template:
+    src: agent-brain-pull.timer.j2
+    dest: /etc/systemd/system/agent-brain-pull.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Enable agent-brain pull timer
+
+- name: Install weekly consolidate/eval service
+  ansible.builtin.template:
+    src: agent-brain-consolidate.service.j2
+    dest: /etc/systemd/system/agent-brain-consolidate.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Enable agent-brain consolidate timer
+- name: Install weekly consolidate/eval timer
+  ansible.builtin.template:
+    src: agent-brain-consolidate.timer.j2
+    dest: /etc/systemd/system/agent-brain-consolidate.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Enable agent-brain consolidate timer

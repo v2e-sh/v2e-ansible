@@ -1,0 +1,29 @@
+[Unit]
+Description=Weekly v2e agent-brain memory consolidation + eval ratchet
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{ agent_brain_user }}
+Group={{ agent_brain_group }}
+Environment=HOME=/home/{{ agent_brain_user }}
+WorkingDirectory={{ agent_brain_dir }}
+# flock: never overlap with a still-running consolidation (a reflective agent pass
+# can be slow). TimeoutStartSec: a hung model call cannot wedge the timer. The two
+# steps run INDEPENDENTLY (set +e + logger), so a failed/rate-limited consolidation
+# no longer starves the eval ratchet; the unit still succeeds so the timer keeps
+# firing. Consolidation NEVER hard-deletes (delete = PR) — it only flips lifecycle
+# status + rebuilds the INDEX, and the auto-write path is gated by `vault check
+# --require`, so an unattended run cannot leak or clobber governed files.
+TimeoutStartSec={{ agent_brain_consolidate_timeout_sec }}
+ExecStart=/usr/bin/flock -n /run/agent-brain-consolidate.lock /bin/sh -c '\
+set +e; \
+logger -t agent-brain-consolidate "starting consolidation via agent-run"; \
+{{ agent_brain_consolidate_command }} \
+  || logger -t agent-brain-consolidate "consolidation step failed (see agent-run output)"; \
+logger -t agent-brain-consolidate "starting eval ratchet"; \
+{{ agent_brain_eval_command }} \
+  || logger -t agent-brain-consolidate "eval ratchet failed (vault eval unavailable or below threshold)"; \
+exit 0'
+

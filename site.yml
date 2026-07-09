@@ -18,3 +18,5 @@
   import_playbook: playbooks/05-tailscale.yml
 - name: Control desktop phase (autologin, resolver, RustDesk client)
   import_playbook: playbooks/06-control-desktop.yml
+- name: Agent brain phase (vault, governance, code intelligence)
+  import_playbook: playbooks/07-agent-brain.yml

@@ -117,6 +117,28 @@
     - config.json
   when: ai_workbench_model_router_enabled
 
+# --- Claude OAuth token (subscription auth; used when no API key is set) ---
+- name: Ensure the agent-run config dir per account (OAuth)
+  ansible.builtin.file:
+    path: "/home/{{ item }}/.config/agent-run"
+    state: directory
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0700"
+  loop: "{{ ai_workbench_anthropic_accounts }}"
+  when: ai_workbench_anthropic_oauth_token | length > 0
+
+- name: Write the CLAUDE_CODE_OAUTH_TOKEN env per account
+  ansible.builtin.copy:
+    content: "CLAUDE_CODE_OAUTH_TOKEN={{ ai_workbench_anthropic_oauth_token }}\n"
+    dest: "/home/{{ item }}/.config/agent-run/env"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    mode: "0600"
+  loop: "{{ ai_workbench_anthropic_accounts }}"
+  when: ai_workbench_anthropic_oauth_token | length > 0
+  no_log: true
+
 # --- agent-run wrapper (system-wide) ---
 - name: Install the agent-run headless wrapper
   ansible.builtin.template:

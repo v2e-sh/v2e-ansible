@@ -1,0 +1,10 @@
+# Managed by Ansible: v2e agent brain.
+export V2E_VAULT_DIR='{{ agent_brain_dir }}/.claude/notes'
+export PATH="$HOME/.local/bin:$PATH"
+{% if agent_brain_graphify_disable_query_log | bool %}
+export GRAPHIFY_QUERY_LOG_DISABLE=1
+{% endif %}
+if [ "${USER:-}" = '{{ agent_brain_user }}' ] && [ -r "$HOME/.config/agent-brain/context7.env" ]; then
+  . "$HOME/.config/agent-brain/context7.env"
+fi
+

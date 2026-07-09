@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically refresh the v2e agent brain
+
+[Timer]
+OnCalendar={{ agent_brain_pull_interval }}
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target
+
