@@ -24,6 +24,9 @@ ai_workbench_anthropic_accounts:
 ai_workbench_codex_accounts:
   - codex
 ai_workbench_anthropic_api_key: "{{ vault_anthropic_api_key | default('') }}"
+# Long-lived OAuth token from `claude setup-token` (subscription auth, headless-friendly).
+# Used via CLAUDE_CODE_OAUTH_TOKEN -- the automated alternative to interactive `claude login`.
+ai_workbench_anthropic_oauth_token: "{{ vault_anthropic_oauth_token | default('') }}"
 ai_workbench_openai_api_key: "{{ vault_openai_api_key | default('') }}"
 
 # model-router: right-sizes the model agent-run picks (see the v2e-agents

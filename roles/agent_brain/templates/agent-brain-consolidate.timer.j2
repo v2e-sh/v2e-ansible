@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically consolidate the v2e agent brain and run the eval ratchet
+
+[Timer]
+OnCalendar={{ agent_brain_consolidate_interval }}
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
+

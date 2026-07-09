@@ -1,0 +1,22 @@
+[Unit]
+Description=Fast-forward the v2e agent brain repositories
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{ agent_brain_user }}
+Group={{ agent_brain_group }}
+Environment=HOME=/home/{{ agent_brain_user }}
+# flock: never overlap with a still-running pull. TimeoutStartSec: a hung network
+# pull cannot wedge the timer. Each repo pulls INDEPENDENTLY (set +e + logger), so a
+# failed/dirty public pull no longer starves the private-memory pull; the unit still
+# succeeds so the timer keeps firing. --ff-only stays: we never auto-merge or rebase.
+TimeoutStartSec=120
+ExecStart=/usr/bin/flock -n /run/agent-brain-pull.lock /bin/sh -c '\
+set +e; \
+for d in "{{ agent_brain_dir }}" "{{ agent_brain_dir }}/.claude/notes/private"; do \
+  git -C "$d" pull --ff-only || logger -t agent-brain "pull failed (dirty tree or non-fast-forward): $d"; \
+done; \
+exit 0'
+
